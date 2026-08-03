@@ -163,18 +163,14 @@ function syncJob() {
     ['endTime', 'end'], ['paymentTiming','paymentTiming'], ['paymentMethod','paymentMethod'], ['fee', 'fee'], ['jobComment', 'comment']
   ].forEach(([id, key]) => current[key] = $(id).value);
   current.fee = +current.fee || 0;
-  current.customPairRate = $('jobPairRate')?.value === '' ? null : +$('jobPairRate').value;
-  current.customFootRate = $('jobFootRate')?.value === '' ? null : +$('jobFootRate').value;
-  current.customBandageRate = $('jobBandageRate')?.value === '' ? null : +$('jobBandageRate').value;
-  current.customBlockRate = $('jobBlockRate')?.value === '' ? null : +$('jobBlockRate').value;
 }
 
-['fee','jobPairRate','jobFootRate','jobBandageRate','jobBlockRate'].forEach(id => document.addEventListener('input', e => {
-  if (e.target.id === id) {
-    syncJob();
-    renderTotals();
-  }
-}));
+document.addEventListener('input', e => {
+  if (!current) return;
+  if (e.target.id === 'fee') { current.fee = +e.target.value || 0; renderTotals(); }
+  const map = {jobPairRate:'customPairRate',jobFootRate:'customFootRate',jobBandageRate:'customBandageRate',jobBlockRate:'customBlockRate'};
+  if (map[e.target.id]) { current[map[e.target.id]] = e.target.value === '' ? null : +e.target.value; renderTotals(); }
+});
 
 function addAnimal() {
   current.animals.forEach(a => a.collapsed = true);
@@ -370,18 +366,22 @@ function calc(job = current) {
 
 function renderTotals() {
   const c = calc();
-  if($('jobPairRate')){ $('jobPairRate').value=current.customPairRate ?? c.pairRate; $('jobFootRate').value=current.customFootRate ?? c.footRate; $('jobBandageRate').value=current.customBandageRate ?? c.bandageRate; $('jobBlockRate').value=current.customBlockRate ?? c.blockRate; }
-  if($('tariffRecap')) $('tariffRecap').innerHTML=`<table><tr><th>Prestation</th><th>Qté</th><th>Tarif HT</th><th>Total</th></tr><tr><td>Déplacement</td><td>1</td><td>${euro(current.fee)}</td><td>${euro(current.fee)}</td></tr><tr><td>Paires</td><td>${c.pairs}</td><td>${euro(c.pairRate)}</td><td>${euro(c.pairs*c.pairRate)}</td></tr><tr><td>Pieds seuls</td><td>${c.single}</td><td>${euro(c.footRate)}</td><td>${euro(c.single*c.footRate)}</td></tr><tr><td>Pansements</td><td>${c.band}</td><td>${euro(c.bandageRate)}</td><td>${euro(c.band*c.bandageRate)}</td></tr><tr><td>Talonnettes</td><td>${c.blocks}</td><td>${euro(c.blockRate)}</td><td>${euro(c.blocks*c.blockRate)}</td></tr></table>`;
-  $('jobTotals').innerHTML = `
-    <span>Animaux <b>${c.n}</b></span>
-    <span>Paires <b>${c.pairs}</b></span>
-    <span>Pieds seuls <b>${c.single}</b></span>
-    <span>Pansements <b>${c.band}</b></span>
-    <span>Talonnettes <b>${c.blocks}</b></span>
-    <span>Total HT <b>${euro(c.ht)}</b></span>
-    <span>TTC <b>${euro(c.ttc)}</b></span>`;
+  if ($('jobPairRate')) {
+    $('jobPairRate').value = current.customPairRate ?? c.pairRate;
+    $('jobFootRate').value = current.customFootRate ?? c.footRate;
+    $('jobBandageRate').value = current.customBandageRate ?? c.bandageRate;
+    $('jobBlockRate').value = current.customBlockRate ?? c.blockRate;
+  }
+  const rows = [
+    ['Déplacement et mise en place', 1, +current.fee || 0, +current.fee || 0],
+    ['Paires de pieds', c.pairs, c.pairRate, c.pairs * c.pairRate],
+    ['Pieds seuls', c.single, c.footRate, c.single * c.footRate],
+    ['Pansements', c.band, c.bandageRate, c.band * c.bandageRate],
+    ['Talonnettes', c.blocks, c.blockRate, c.blocks * c.blockRate]
+  ];
+  if ($('pricingSummary')) $('pricingSummary').innerHTML = `<table class="pricingTable"><tr><th>Prestation</th><th>Quantité</th><th>Tarif HT</th><th>Sous-total HT</th></tr>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${euro(r[2])}</td><td><b>${euro(r[3])}</b></td></tr>`).join('')}<tr class="pricingTotal"><th colspan="3">Total HT</th><th>${euro(c.ht)}</th></tr><tr class="pricingTotal"><th colspan="3">TVA ${settings.vat}%</th><th>${euro(c.ttc-c.ht)}</th></tr><tr class="pricingTotal"><th colspan="3">Total TTC</th><th>${euro(c.ttc)}</th></tr></table>`;
+  $('jobTotals').innerHTML = `<span>Animaux <b>${c.n}</b></span><span>Paires <b>${c.pairs}</b></span><span>Pieds seuls <b>${c.single}</b></span><span>Pansements <b>${c.band}</b></span><span>Talonnettes <b>${c.blocks}</b></span><span>Total HT <b>${euro(c.ht)}</b></span><span>TTC <b>${euro(c.ttc)}</b></span>`;
 }
-
 function saveJob() {
   syncJob();
   if (!current.cheptel) return toast('Saisissez le numéro de cheptel');
@@ -542,7 +542,7 @@ function printProforma() {
   w.document.close();
 }
 
-function toggleTariffEdit(){const e=$('tariffEdit');e.hidden=!e.hidden;}
+function toggleRateEditing(){const e=$('rateEditing');e.hidden=!e.hidden;$('editRatesBtn').textContent=e.hidden?'Modifier un tarif':'Masquer les tarifs';}
 
 function renderStats() {
   const month = $('statsMonth').value || today().slice(0, 7);
