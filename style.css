@@ -12,3 +12,13 @@
 .pdfToolbar{background:white;border-radius:12px;padding:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pdfToolbar strong{margin-right:auto}.pdfOverlay iframe{background:white;border:0;border-radius:12px;width:100%;flex:1}.generatedFile{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid #edbfd4;border-radius:10px;padding:10px;margin:8px 0}.generatedFile .grow{flex:1}.cloudStatus{padding:8px;border-radius:8px;background:#fdeaf3;margin-top:8px}
 header .appLogo{width:185px!important;height:86px!important;object-fit:contain!important;object-position:left center;background:transparent}
 @media(max-width:600px){header .appLogo{width:160px!important;height:74px!important}.headerTitle{display:none}}
+/* V2.0 : logo fiable et état de synchronisation */
+header .appLogo{width:230px!important;height:82px!important;object-fit:contain!important;object-position:left center!important;background:transparent!important}
+.headerStatus{margin-left:auto;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+.syncBadge{border-radius:999px;padding:5px 9px;font-size:11px;font-weight:700;white-space:nowrap;border:1px solid transparent}
+.syncBadge.ok{background:#e3f5e8;color:#246b39;border-color:#a8d8b3}
+.syncBadge.pending{background:#fff1d8;color:#76500b;border-color:#e5c274}
+.syncBadge.error{background:#ffe3e3;color:#9b2828;border-color:#e7abab}
+.syncBadge.working{background:#eee7fb;color:#5b3d8e;border-color:#c7b5e8}
+.versionBadge{margin-left:0!important}
+@media(max-width:650px){header .appLogo{width:205px!important;height:75px!important;max-width:57vw!important}.headerStatus{gap:3px}.syncBadge{font-size:9px;padding:4px 6px}.versionBadge{font-size:10px}}

@@ -51,7 +51,7 @@ let settings = Object.assign({
 }, JSON.parse(localStorage.getItem('parage.settings') || '{}'));
 let costs = JSON.parse(localStorage.getItem('parage.costs') || '{}');
 let addressOverrides = JSON.parse(localStorage.getItem('parage.addressOverrides') || '{}');
-const APP_VERSION='1.9';
+const APP_VERSION='2.0';
 
 function saveAll() {
   localStorage.setItem('parage.jobs', JSON.stringify(jobs));
@@ -848,7 +848,7 @@ $('installBtn').onclick = async () => {
   }
 };
 
-/* ===== V1.9 : archives internes, partage, cloud et base adresses ===== */
+/* ===== V2.0 : archives internes, partage, cloud et base adresses ===== */
 let importedClients = JSON.parse(localStorage.getItem('parage.importedClients') || '[]');
 settings.supabaseUrl = settings.supabaseUrl || '';
 settings.supabaseKey = settings.supabaseKey || '';
@@ -863,7 +863,7 @@ function mergeClientBases(base, imported) {
 const originalInit = init;
 init = async function() {
   try {
-    const base = await fetch('clients.json?v=1.9').then(r => r.json());
+    const base = await fetch('clients.json?v=2.0').then(r => r.json());
     clients = mergeClientBases(base, importedClients);
   } catch {
     clients = mergeClientBases([], importedClients);
@@ -876,7 +876,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=1.9').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=2.0').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -1027,5 +1027,47 @@ async function cloudRestore(){
   const url=(settings.supabaseUrl||'').replace(/\/$/,'');const key=settings.supabaseKey||'';if(!url||!key)return toast('Renseignez Supabase dans Paramètres');
   try{const r=await fetch(`${url}/rest/v1/parage_backups?id=eq.suivi-parage-main&select=payload`,{headers:{apikey:key,Authorization:`Bearer ${key}`}});const a=await r.json();if(!a[0]?.payload)throw 0;const x=a[0].payload;jobs=x.jobs||jobs;costs=x.costs||costs;addressOverrides=x.addressOverrides||addressOverrides;importedClients=x.importedClients||importedClients;saveAll();localStorage.setItem('parage.costs',JSON.stringify(costs));localStorage.setItem('parage.addressOverrides',JSON.stringify(addressOverrides));localStorage.setItem('parage.importedClients',JSON.stringify(importedClients));toast('Sauvegarde en ligne restaurée');location.reload();}catch{toast('Restauration impossible');}
 }
+
+
+/* ===== V2.0 : local-first et synchronisation automatique ===== */
+const baseSaveAllV20 = saveAll;
+let syncInProgressV20 = false;
+
+function pendingSyncV20(){return localStorage.getItem('parage.syncPending')==='1';}
+function markSyncPendingV20(){localStorage.setItem('parage.syncPending','1');updateSyncBadgeV20();}
+function clearSyncPendingV20(){localStorage.removeItem('parage.syncPending');localStorage.setItem('parage.lastSyncAt',new Date().toISOString());updateSyncBadgeV20();}
+function updateSyncBadgeV20(message=''){
+  const el=$('syncBadge'); if(!el)return;
+  el.classList.remove('ok','pending','error','working');
+  if(syncInProgressV20){el.classList.add('working');el.textContent='Synchronisation…';return;}
+  if(!navigator.onLine){el.classList.add('pending');el.textContent='Hors ligne · enregistré localement';return;}
+  if(pendingSyncV20()){el.classList.add('pending');el.textContent=message||'En attente d’envoi';return;}
+  const last=localStorage.getItem('parage.lastSyncAt');
+  el.classList.add('ok');el.textContent=last?'Cloud à jour':'En ligne';
+}
+
+saveAll = function(){baseSaveAllV20();markSyncPendingV20();};
+
+const cloudBackupBaseV20 = cloudBackup;
+cloudBackup = async function(showMessage=true){
+  if(syncInProgressV20)return false;
+  if(!navigator.onLine){markSyncPendingV20();if(showMessage)toast('Pas de réseau : sauvegarde conservée sur l’appareil');return false;}
+  if(!(settings.supabaseUrl||'').trim()||!(settings.supabaseKey||'').trim()){
+    markSyncPendingV20();if(showMessage)toast('Renseignez Supabase dans Paramètres');return false;
+  }
+  syncInProgressV20=true;updateSyncBadgeV20();
+  const ok=await cloudBackupBaseV20(false);
+  syncInProgressV20=false;
+  if(ok){clearSyncPendingV20();if(showMessage)toast('Données synchronisées avec Supabase');}
+  else{markSyncPendingV20();updateSyncBadgeV20('Erreur · nouvel essai automatique');if(showMessage)toast('Enregistré localement — nouvel essai automatique');}
+  return ok;
+};
+
+async function retryPendingSyncV20(){if(navigator.onLine&&pendingSyncV20())await cloudBackup(false);else updateSyncBadgeV20();}
+window.addEventListener('online',()=>{updateSyncBadgeV20();retryPendingSyncV20();});
+window.addEventListener('offline',updateSyncBadgeV20);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')retryPendingSyncV20();});
+setInterval(retryPendingSyncV20,60000);
+setTimeout(()=>{updateSyncBadgeV20();retryPendingSyncV20();},1200);
 
 init();
