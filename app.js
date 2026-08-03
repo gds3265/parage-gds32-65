@@ -491,10 +491,25 @@ function xmlRow(arr) {
 function printProforma() {
   syncJob();
   const c = calc();
-  const details = current.animals.flatMap(animal => Object.entries(animal.claws || {})
-    .filter(([_, d]) => d.touched || d.issues?.length || d.care?.length)
-    .map(([k, d]) => `<tr><td>${esc(animal.number)}</td><td>${esc(animal.category)}</td><td>${k.split('-')[0]}</td><td>${k.split('-')[1]}</td><td>${esc((d.issues || []).join(', '))}</td><td>${esc((d.care || []).join(', '))}</td><td>${esc(d.note || '')}</td></tr>`))
-    .join('');
+  const footLabels = Object.fromEntries(feet);
+  const sideLabels = {Int:'Interne', Ext:'Externe'};
+  const detailRows = [];
+  for (const animal of current.animals || []) {
+    ensureWorkedFeet(animal);
+    const clawEntries = Object.entries(animal.claws || {}).filter(([_, d]) => d.touched || d.issues?.length || d.care?.length);
+    const feetWithDetail = new Set();
+    for (const [key, d] of clawEntries) {
+      const [footCode, side] = key.split('-');
+      feetWithDetail.add(footCode);
+      detailRows.push(`<tr><td>${esc(animal.number)}</td><td>${esc(animal.category)}</td><td>${esc(footLabels[footCode] || footCode)}</td><td>${esc(sideLabels[side] || side)}</td><td>${esc((d.issues || []).join(', '))}</td><td>${esc((d.care || []).join(', '))}</td><td>${esc(d.note || '')}</td></tr>`);
+    }
+    for (const footCode of animal.workedFeet || []) {
+      if (!feetWithDetail.has(footCode)) {
+        detailRows.push(`<tr><td>${esc(animal.number)}</td><td>${esc(animal.category)}</td><td>${esc(footLabels[footCode] || footCode)}</td><td>—</td><td>—</td><td>Parage</td><td>—</td></tr>`);
+      }
+    }
+  }
+  const details = detailRows.join('');
 
   const logoUrl = LOGO_DATA;
   const w = open('', '_blank');
