@@ -45,11 +45,13 @@ let settings = Object.assign({
   blockPrice: 15,
   businessName: 'GDS Gers Hautes-Pyrénées',
   businessDetails: "GDS 32 - Gers Hautes-Pyrénées\n3 chemin de la caillaouère\n32000 AUCH",
-  accountingEmail: ''
+  accountingEmail: '',
+  supabaseUrl: '',
+  supabaseKey: ''
 }, JSON.parse(localStorage.getItem('parage.settings') || '{}'));
 let costs = JSON.parse(localStorage.getItem('parage.costs') || '{}');
 let addressOverrides = JSON.parse(localStorage.getItem('parage.addressOverrides') || '{}');
-const APP_VERSION='1.8';
+const APP_VERSION='1.9';
 
 function saveAll() {
   localStorage.setItem('parage.jobs', JSON.stringify(jobs));
@@ -271,7 +273,7 @@ function renderAnimals() {
       </div>
       ${animal.collapsed ? '' : `
         ${hist.length ? `<div class="historyAlert"><b>Historique trouvé</b> — dernier passage ${fmtDate(hist[0].date)} : ${summaryAnimal(hist[0].animal)}</div>` : ''}
-        <div class="quickGroups"><div class="quickGroup"><b>1 paire</b><button onclick="setWorkedFeet('${animal.id}',['PAvG','PAvD'],true)">Antérieurs</button><button onclick="setWorkedFeet('${animal.id}',['PArG','PArD'],true)">Postérieurs</button></div><div class="quickGroup"><b>2 paires</b><button onclick="setWorkedFeet('${animal.id}',['PAvG','PAvD','PArG','PArD'],true)">4 pieds</button></div><div class="quickGroup oneFeet"><b>1 pied</b>${quickFootButtons.map(([code,label])=>`<button onclick="setWorkedFeet('${animal.id}',['${code}'],true)">${label}</button>`).join('')}</div><button onclick="setWorkedFeet('${animal.id}',['PAvG','PAvD','PArG','PArD'],false)">Effacer</button></div>
+        <div class="quickGroups"><div class="quickGroup"><b>1 paire</b><button class="${animal.workedFeet.includes('PAvG')&&animal.workedFeet.includes('PAvD')?'on':''}" onclick="setWorkedFeet('${animal.id}',['PAvG','PAvD'],true)">Antérieurs</button><button class="${animal.workedFeet.includes('PArG')&&animal.workedFeet.includes('PArD')?'on':''}" onclick="setWorkedFeet('${animal.id}',['PArG','PArD'],true)">Postérieurs</button></div><div class="quickGroup"><b>2 paires</b><button class="${animal.workedFeet.length===4?'on':''}" onclick="setWorkedFeet('${animal.id}',['PAvG','PAvD','PArG','PArD'],true)">4 pieds</button></div><div class="quickGroup oneFeet"><b>1 pied</b>${quickFootButtons.map(([code,label])=>`<button class="${animal.workedFeet.includes(code)?'on':''}" onclick="setWorkedFeet('${animal.id}',['${code}'],true)">${label}</button>`).join('')}</div><button onclick="setWorkedFeet('${animal.id}',['PAvG','PAvD','PArG','PArD'],false)">Effacer</button></div>
         <p class="hint">Cliquez sur « Pied fait » pour un pied seul. Cliquez sur un onglon uniquement pour enregistrer un problème ou un soin.</p>
         <div class="feet">${feet.map(f => footHTML(animal, f[0], f[1])).join('')}</div>
         <label>Observation générale<input value="${esc(animal.notes)}" onchange="updateAnimal('${animal.id}','notes',this.value)"></label>
@@ -845,5 +847,185 @@ $('installBtn').onclick = async () => {
     $('installBtn').hidden = true;
   }
 };
+
+/* ===== V1.9 : archives internes, partage, cloud et base adresses ===== */
+let importedClients = JSON.parse(localStorage.getItem('parage.importedClients') || '[]');
+settings.supabaseUrl = settings.supabaseUrl || '';
+settings.supabaseKey = settings.supabaseKey || '';
+
+function mergeClientBases(base, imported) {
+  const map = new Map();
+  for (const c of base || []) if (c.cheptel) map.set(String(c.cheptel), c);
+  for (const c of imported || []) if (c.cheptel) map.set(String(c.cheptel), Object.assign({}, map.get(String(c.cheptel)) || {}, c));
+  return [...map.values()];
+}
+
+const originalInit = init;
+init = async function() {
+  try {
+    const base = await fetch('clients.json?v=1.9').then(r => r.json());
+    clients = mergeClientBases(base, importedClients);
+  } catch {
+    clients = mergeClientBases([], importedClients);
+  }
+  $('clientsList').innerHTML = clients.slice(0, 15000).map(c => `<option value="${esc(c.cheptel)}">${esc(c.nom || '')}</option>`).join('');
+  $('races').innerHTML = races.map(x => `<option value="${x}">`).join('');
+  bindClient();
+  loadSettings();
+  $('statsMonth').value = today().slice(0, 7);
+  renderHome();
+  newJob();
+  renderGeneratedFiles();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=1.9').then(r => r.update()).catch(()=>{});
+};
+
+function openArchiveDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('suivi-parage-files', 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('files')) db.createObjectStore('files', { keyPath: 'id' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function storeGeneratedFile(name, blob, kind, jobId='') {
+  const db = await openArchiveDb();
+  const record = { id: uid(), name, blob, kind, jobId, createdAt: new Date().toISOString() };
+  await new Promise((resolve,reject)=>{const tx=db.transaction('files','readwrite');tx.objectStore('files').put(record);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
+  db.close();
+  renderGeneratedFiles();
+  return record;
+}
+async function listGeneratedFiles() {
+  const db = await openArchiveDb();
+  const rows = await new Promise((resolve,reject)=>{const tx=db.transaction('files','readonly');const req=tx.objectStore('files').getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);});
+  db.close();
+  return rows.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+}
+async function deleteGeneratedFile(id) {
+  const db=await openArchiveDb();
+  await new Promise((resolve,reject)=>{const tx=db.transaction('files','readwrite');tx.objectStore('files').delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
+  db.close(); renderGeneratedFiles();
+}
+async function renderGeneratedFiles() {
+  const el=$('generatedFilesList'); if(!el) return;
+  const rows=await listGeneratedFiles().catch(()=>[]);
+  el.innerHTML=rows.length?rows.slice(0,40).map(r=>`<div class="generatedFile"><div class="grow"><b>${esc(r.name)}</b><br><small>${new Date(r.createdAt).toLocaleString('fr-FR')}</small></div><button onclick="openStoredFile('${r.id}')">Ouvrir</button><button onclick="shareStoredFile('${r.id}')">Partager</button><button onclick="deleteGeneratedFile('${r.id}')">Supprimer</button></div>`).join(''):'<p>Aucun fichier généré.</p>';
+}
+async function getStoredFile(id){return (await listGeneratedFiles()).find(x=>x.id===id);}
+async function openStoredFile(id){const r=await getStoredFile(id);if(r)openPdfPreview(r.blob,r.name);}
+async function shareStoredFile(id){const r=await getStoredFile(id);if(r)await shareBlob(r.blob,r.name);}
+
+async function shareBlob(blob, name) {
+  const file = new File([blob], name, {type: blob.type || 'application/octet-stream'});
+  if (navigator.canShare && navigator.canShare({files:[file]})) {
+    await navigator.share({title:name,files:[file]}).catch(()=>{});
+  } else {
+    download(blob,name);
+    toast('Fichier téléchargé');
+  }
+}
+
+function openPdfPreview(blob, name) {
+  document.querySelector('.pdfOverlay')?.remove();
+  const url=URL.createObjectURL(blob);
+  const overlay=document.createElement('div'); overlay.className='pdfOverlay';
+  overlay.innerHTML=`<div class="pdfToolbar"><strong>${esc(name)}</strong><button class="primary" id="pdfShare">Partager / imprimer</button><button id="pdfClose">Retour à l’application</button></div><iframe title="Aperçu pro forma" src="${url}"></iframe>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#pdfClose').onclick=()=>{URL.revokeObjectURL(url);overlay.remove();};
+  overlay.querySelector('#pdfShare').onclick=()=>shareBlob(blob,name);
+}
+
+function proformaPdfBlob(job){return new Blob([makeSimplePdf(jobPdfLinesV19(job))],{type:'application/pdf'});}
+function jobPdfLinesV19(job){
+  const c=calc(job), fl=Object.fromEntries(feet), lines=[];
+  lines.push('GDS GERS HAUTES-PYRENEES                 PRO FORMA / COMPTE RENDU DE PARAGE');
+  lines.push('3 chemin de la Caillaouere - 32000 AUCH');
+  lines.push('--------------------------------------------------------------------------');
+  lines.push(`ELEVEUR : ${job.clientName||''}`);
+  lines.push(`CHEPTEL : ${job.cheptel||''}    DATE : ${fmtDate(job.date)}    HEURES : ${job.start||''} - ${job.end||''}`);
+  lines.push(`${job.address||''}  ${job.cpVille||''}`);
+  lines.push('');
+  lines.push('PRESTATIONS                         QTE       TARIF HT       TOTAL HT');
+  lines.push(`Deplacement / mise en place           1       ${euro(job.fee)}       ${euro(job.fee)}`);
+  lines.push(`Paires de pieds                       ${c.pairs}       ${euro(c.pairRate)}       ${euro(c.pairs*c.pairRate)}`);
+  lines.push(`Pieds seuls                           ${c.single}       ${euro(c.footRate)}       ${euro(c.single*c.footRate)}`);
+  lines.push(`Pansements                            ${c.band}       ${euro(c.bandageRate)}       ${euro(c.band*c.bandageRate)}`);
+  lines.push(`Talonnettes                           ${c.blocks}       ${euro(c.blockRate)}       ${euro(c.blocks*c.blockRate)}`);
+  lines.push(`TOTAL HT : ${euro(c.ht)}     TVA ${settings.vat}% : ${euro(c.ttc-c.ht)}     TOTAL TTC : ${euro(c.ttc)}`);
+  lines.push('--------------------------------------------------------------------------');
+  lines.push('RECAPITULATIF DE L INTERVENTION');
+  for(const a of job.animals||[]){
+    ensureWorkedFeet(a); const probs=[], soins=new Set();
+    for(const [k,d] of Object.entries(a.claws||{})){if((d.issues||[]).length)probs.push(`${k}: ${(d.issues||[]).join(', ')}`);for(const x of (d.care||[]))if(x==='Pansement'||x==='Talonnette')soins.add(x);}
+    const line=`${a.number||'-'} | ${categoryLabels[a.category]||a.category||'-'} | ${(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')} | ${probs.join('; ')||'RAS'} | ${[...soins].join(', ')||'-'}${a.checkNext?' | A CONTROLER':''}`;
+    lines.push(...wrapPdf(line,105));
+  }
+  lines.push(''); lines.push(`Modalite : ${job.paymentTiming||''}   Mode : ${job.paymentMethod||''}`);
+  lines.push('Paiement a 20 jours - IBAN FR76 1690 6010 2003 4001 9914 139 - BIC AGRIFRPP869');
+  return lines;
+}
+
+finishJob = async function() {
+  syncJob();
+  current.animals=current.animals.filter(a=>hasAnimalContent(a));
+  if(!current.animals.length)return toast('Aucun bovin enregistré');
+  current.animals.forEach(a=>{a.done=true;a.collapsed=true;});
+  current.end=nowTime(); $('endTime').value=current.end; current.status='finished';
+  saveAddressOverride(true); saveJob(); archiveFinishedJob(current);
+  const snapshot=JSON.parse(JSON.stringify(current));
+  const name=`Proforma_${snapshot.cheptel}_${snapshot.date}.pdf`;
+  const pdf=proformaPdfBlob(snapshot);
+  await storeGeneratedFile(name,pdf,'proforma',snapshot.id).catch(()=>{});
+  cloudBackup(false);
+  openPdfPreview(pdf,name);
+  toast(`Chantier validé : ${calc(snapshot).n} bovin(s) — fin ${snapshot.end}`);
+};
+
+printProforma = function(){syncJob();const name=`Proforma_${current.cheptel||'chantier'}_${current.date}.pdf`;openPdfPreview(proformaPdfBlob(current),name);};
+
+async function prepareAndShareAccounting(){
+  const rows=selectedExportJobs(); if(!rows.length)return toast('Sélectionnez les chantiers à transmettre');
+  const day=rows[0].date||today(); const files=[{name:`Export_comptable_${day}.xls`,data:buildAccountingXml(rows)}];
+  for(const j of rows){const safe=(j.cheptel||'sans_cheptel').replace(/[^a-zA-Z0-9_-]/g,'_');files.push({name:`Proformas/Proforma_${safe}_${j.date}.pdf`,data:new Uint8Array(await proformaPdfBlob(j).arrayBuffer())});}
+  const zip=zipStore(files), name=`Compta_parage_${day}.zip`;
+  const record=await storeGeneratedFile(name,zip,'zip');
+  const file=new File([zip],name,{type:'application/zip'});
+  let shared=false;
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({title:`Parage ${fmtDate(day)}`,text:`${rows.length} chantier(s) de parage`,files:[file]});shared=true;}catch{}
+  }else{download(zip,name);toast('ZIP enregistré dans les fichiers générés');}
+  if(shared){rows.forEach(j=>j.exportedAt=new Date().toISOString());saveAll();renderExports();toast('ZIP partagé à la comptabilité');}
+}
+
+downloadAccountingZip = prepareAndShareAccounting;
+prepareAccountingEmail = prepareAndShareAccounting;
+
+const oldRenderExports=renderExports;
+renderExports=function(){oldRenderExports();renderGeneratedFiles();};
+
+function parseCsvClients(text){
+  const lines=text.split(/\r?\n/).filter(Boolean); if(!lines.length)return[];
+  const sep=lines[0].includes(';')?';':','; const headers=lines.shift().split(sep).map(x=>x.trim().toLowerCase());
+  const idx=(...names)=>headers.findIndex(h=>names.some(n=>h.includes(n)));
+  const ci=idx('cheptel','numero','n°'), ni=idx('nom'), ai=idx('adresse'), cpi=idx('cp','postal','ville'), di=idx('departement');
+  return lines.map(line=>{const a=line.split(sep).map(x=>x.trim().replace(/^"|"$/g,''));return{cheptel:(a[ci]||'').replace(/\D/g,''),nom:a[ni]||'',adresse:a[ai]||'',cpVille:a[cpi]||'',departement:a[di]||''};}).filter(x=>x.cheptel);
+}
+function importAddressBase(e){
+  const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{let arr;if(f.name.toLowerCase().endsWith('.csv'))arr=parseCsvClients(r.result);else{const x=JSON.parse(r.result);arr=Array.isArray(x)?x:(x.clients||x.addresses||Object.values(x));}importedClients=mergeClientBases(importedClients,arr);localStorage.setItem('parage.importedClients',JSON.stringify(importedClients));clients=mergeClientBases(clients,importedClients);$('clientsList').innerHTML=clients.map(c=>`<option value="${esc(c.cheptel)}">${esc(c.nom||'')}</option>`).join('');toast(`${arr.length} adresse(s) intégrée(s). Les saisies manuelles restent prioritaires.`);}catch(err){toast('Fichier d’adresses invalide');}};r.readAsText(f);e.target.value='';
+}
+
+async function cloudBackup(showMessage=true){
+  syncJob(); const url=(settings.supabaseUrl||'').replace(/\/$/,''); const key=settings.supabaseKey||'';
+  if(!url||!key){if(showMessage)toast('Renseignez Supabase dans Paramètres');return false;}
+  const payload={jobs,settings:Object.assign({},settings,{supabaseKey:''}),costs,addressOverrides,importedClients,version:APP_VERSION};
+  try{const r=await fetch(`${url}/rest/v1/parage_backups`,{method:'POST',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify({id:'suivi-parage-main',payload,updated_at:new Date().toISOString()})});if(!r.ok)throw new Error(await r.text());if(showMessage)toast('Sauvegarde en ligne effectuée');return true;}catch(e){if(showMessage)toast('Échec sauvegarde en ligne');return false;}
+}
+async function cloudRestore(){
+  const url=(settings.supabaseUrl||'').replace(/\/$/,'');const key=settings.supabaseKey||'';if(!url||!key)return toast('Renseignez Supabase dans Paramètres');
+  try{const r=await fetch(`${url}/rest/v1/parage_backups?id=eq.suivi-parage-main&select=payload`,{headers:{apikey:key,Authorization:`Bearer ${key}`}});const a=await r.json();if(!a[0]?.payload)throw 0;const x=a[0].payload;jobs=x.jobs||jobs;costs=x.costs||costs;addressOverrides=x.addressOverrides||addressOverrides;importedClients=x.importedClients||importedClients;saveAll();localStorage.setItem('parage.costs',JSON.stringify(costs));localStorage.setItem('parage.addressOverrides',JSON.stringify(addressOverrides));localStorage.setItem('parage.importedClients',JSON.stringify(importedClients));toast('Sauvegarde en ligne restaurée');location.reload();}catch{toast('Restauration impossible');}
+}
 
 init();
