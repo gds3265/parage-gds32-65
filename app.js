@@ -48,6 +48,8 @@ let settings = Object.assign({
   accountingEmail: ''
 }, JSON.parse(localStorage.getItem('parage.settings') || '{}'));
 let costs = JSON.parse(localStorage.getItem('parage.costs') || '{}');
+let addressOverrides = JSON.parse(localStorage.getItem('parage.addressOverrides') || '{}');
+const APP_VERSION='1.8';
 
 function saveAll() {
   localStorage.setItem('parage.jobs', JSON.stringify(jobs));
@@ -66,6 +68,7 @@ function showView(viewId) {
   if (viewId === 'exports') renderExports();
   if (viewId === 'stats') renderStats();
   if (viewId === 'home') renderHome();
+  if (viewId === 'addresses') renderAddressOverrides();
 }
 
 document.querySelectorAll('#nav button').forEach(btn => btn.onclick = () => showView(btn.dataset.view));
@@ -93,18 +96,21 @@ function bindClient() {
     clearTimeout(timer);
     const q = e.target.value.replace(/\D/g, '');
     timer = setTimeout(() => {
-      const client = clients.find(x => x.cheptel === q);
-      if (client) {
+      const base = clients.find(x => x.cheptel === q) || {};
+      const corrected = addressOverrides[q] || {};
+      const client = Object.assign({}, base, corrected);
+      if (base.cheptel || corrected.cheptel) {
         $('clientName').value = client.nom || '';
         $('address').value = client.adresse || '';
         $('cpVille').value = client.cpVille || '';
         $('department').value = client.departement || '';
-        renderPaymentAlert();
       }
+      if (current) current.cheptel = q;
+      renderPaymentAlert();
+      renderAnimalsToReviewAlert();
     }, 100);
   });
 }
-
 function blankJob() {
   return {
     id: uid(),
@@ -155,6 +161,7 @@ function fillJob() {
   renderAnimals();
   renderTotals();
   renderPaymentAlert();
+  renderAnimalsToReviewAlert();
 }
 
 function syncJob() {
@@ -269,7 +276,7 @@ function renderAnimals() {
         <div class="feet">${feet.map(f => footHTML(animal, f[0], f[1])).join('')}</div>
         <label>Observation générale<input value="${esc(animal.notes)}" onchange="updateAnimal('${animal.id}','notes',this.value)"></label>
         <label class="checkNextBottom"><input type="checkbox" ${animal.checkNext ? 'checked' : ''} onchange="updateAnimal('${animal.id}','checkNext',this.checked)"> Bovin à contrôler à la prochaine visite</label>
-        <div class="animalActions"><button class="primary big" onclick="completeAnimal('${animal.id}')">✓ Bovin terminé → suivant</button></div>
+        <div class="animalActions"><button class="primary big" onclick="completeAnimal('${animal.id}')">✓ Bovin terminé → suivant</button><button class="lastAnimalBtn big" onclick="completeLastAnimal('${animal.id}')">Dernier bovin → récapitulatif</button></div>
       `}
     `;
     $('animals').appendChild(div);
@@ -383,6 +390,7 @@ function renderTotals() {
   if ($('pricingSummary')) $('pricingSummary').innerHTML = `<table class="pricingTable"><tr><th>Prestation</th><th>Quantité</th><th>Tarif HT</th><th>Sous-total HT</th></tr>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${euro(r[2])}</td><td><b>${euro(r[3])}</b></td></tr>`).join('')}<tr class="pricingTotal"><th colspan="3">Total HT</th><th>${euro(c.ht)}</th></tr><tr class="pricingTotal"><th colspan="3">TVA ${settings.vat}%</th><th>${euro(c.ttc-c.ht)}</th></tr><tr class="pricingTotal"><th colspan="3">Total TTC</th><th>${euro(c.ttc)}</th></tr></table>`;
   $('jobTotals').innerHTML = `<span>Animaux <b>${c.n}</b></span><span>Paires <b>${c.pairs}</b></span><span>Pieds seuls <b>${c.single}</b></span><span>Pansements <b>${c.band}</b></span><span>Talonnettes <b>${c.blocks}</b></span><span>Total HT <b>${euro(c.ht)}</b></span><span>TTC <b>${euro(c.ttc)}</b></span>`;
   if ($('finishJobBtn')) $('finishJobBtn').textContent = `Terminer le chantier (${c.n} bovin${c.n > 1 ? 's' : ''} fait${c.n > 1 ? 's' : ''})`;
+  if ($('validateJobBtn')) $('validateJobBtn').textContent = `Valider le chantier (${c.n} bovin${c.n > 1 ? 's' : ''})`;
 }
 function saveJob() {
   syncJob();
@@ -398,14 +406,17 @@ function saveJob() {
 function finishJob() {
   syncJob();
   current.animals = current.animals.filter(a => hasAnimalContent(a));
-  current.animals.forEach(a => { if (hasAnimalContent(a)) a.done = true; });
-  if (!current.end) current.end = nowTime();
+  if (!current.animals.length) return toast('Aucun bovin enregistré');
+  current.animals.forEach(a => { if (hasAnimalContent(a)) { a.done = true; a.collapsed = true; } });
+  current.end = nowTime();
+  $('endTime').value = current.end;
   current.status = 'finished';
+  saveAddressOverride(true);
   saveJob();
+  archiveFinishedJob(current);
   fillJob();
-  toast('Chantier terminé et prêt à transmettre');
+  toast(`Chantier validé : ${calc(current).n} bovin(s), heure de fin ${current.end}`);
 }
-
 function renderPaymentAlert() {
   const unpaid = jobs.filter(j => j.cheptel === current.cheptel && ['pending', 'late', 'partial'].includes(j.paymentStatus));
   $('paymentAlert').innerHTML = unpaid.length
@@ -458,6 +469,7 @@ function openJob(id) {
 }
 
 function renderExports() {
+  renderArchiveStatus();
   const arr = jobs.filter(j => j.status === 'finished' && !j.exportedAt);
   $('exportList').innerHTML = arr.map(j => `<div class="row"><input type="checkbox" class="expCheck" value="${j.id}"><div class="grow"><b>${fmtDate(j.date)} — ${esc(j.clientName || j.cheptel)}</b><br><small>${j.cheptel} · ${calc(j).n} bovins · ${euro(calc(j).ttc)} TTC</small></div></div>`).join('') || '<p>Aucun chantier à transmettre.</p>';
 }
@@ -775,6 +787,50 @@ function esc(s) {
 
 function xmlEsc(s) { return esc(s); }
 function nl2br(s) { return esc(s).replace(/\n/g, '<br>'); }
+
+function completeLastAnimal(id) {
+  const animal=current.animals.find(x=>x.id===id);
+  if(!animal) return;
+  if(!String(animal.number||'').trim()) return toast('Saisissez le numéro de travail');
+  animal.done=true; animal.collapsed=true;
+  saveDraftSilently();
+  renderAnimals();
+  renderTotals();
+  document.getElementById('pricingSummary')?.scrollIntoView({behavior:'smooth',block:'start'});
+  toast(`Dernier bovin enregistré — ${calc().n} bovin(s) au total`);
+}
+
+function latestAnimalsToReview(cheptel) {
+  const latest={};
+  jobs.filter(j=>j.cheptel===cheptel && j.status==='finished').sort((a,b)=>(b.date||'').localeCompare(a.date||'')).forEach(j=>{
+    for(const a of (j.animals||[])) if(a.number && !latest[a.number]) latest[a.number]={date:j.date,checkNext:!!a.checkNext};
+  });
+  return Object.entries(latest).filter(([_,v])=>v.checkNext).map(([number,v])=>({number,date:v.date}));
+}
+
+function renderAnimalsToReviewAlert() {
+  const el=$('animalsToReviewAlert'); if(!el||!current) return;
+  const q=($('cheptel').value||current.cheptel||'').replace(/\D/g,'');
+  const list=latestAnimalsToReview(q);
+  el.innerHTML=list.length?`<div class="reviewAlert"><b>⚠ Bovins à revoir :</b> ${list.map(x=>`vache ${esc(x.number)} (signalée le ${fmtDate(x.date)})`).join(' · ')}</div>`:'';
+}
+
+function currentAddressData(){return {cheptel:($('cheptel').value||'').replace(/\D/g,''),nom:$('clientName').value.trim(),adresse:$('address').value.trim(),cpVille:$('cpVille').value.trim(),departement:$('department').value.trim(),updatedAt:new Date().toISOString()};}
+function saveAddressOverride(silent=false){const d=currentAddressData();if(!d.cheptel){if(!silent)toast('Saisissez un numéro de cheptel');return;}const b=clients.find(x=>x.cheptel===d.cheptel)||{};const changed=(d.nom||'')!==(b.nom||'')||(d.adresse||'')!==(b.adresse||'')||(d.cpVille||'')!==(b.cpVille||'')||(d.departement||'')!==(b.departement||'');if(changed){addressOverrides[d.cheptel]=d;localStorage.setItem('parage.addressOverrides',JSON.stringify(addressOverrides));}if(!silent){renderAddressOverrides();toast(changed?'Adresse corrigée enregistrée':'Adresse identique à la base');}}
+function restoreBaseAddress(){const q=($('cheptel').value||'').replace(/\D/g,'');const c=clients.find(x=>x.cheptel===q);if(!c)return toast('Adresse de base introuvable');delete addressOverrides[q];localStorage.setItem('parage.addressOverrides',JSON.stringify(addressOverrides));$('clientName').value=c.nom||'';$('address').value=c.adresse||'';$('cpVille').value=c.cpVille||'';$('department').value=c.departement||'';toast('Adresse de base restaurée');}
+function renderAddressOverrides(){const el=$('addressOverrideList');if(!el)return;const rows=Object.values(addressOverrides).sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));el.innerHTML=rows.length?rows.map(a=>`<div class="row"><div class="grow"><b>${esc(a.cheptel)} — ${esc(a.nom)}</b><br><small>${esc(a.adresse)} · ${esc(a.cpVille)} · ${esc(a.departement)}</small></div><button onclick="deleteAddressOverride('${esc(a.cheptel)}')">Supprimer</button></div>`).join(''):'<p>Aucune correction enregistrée.</p>';}
+function deleteAddressOverride(q){delete addressOverrides[q];localStorage.setItem('parage.addressOverrides',JSON.stringify(addressOverrides));renderAddressOverrides();}
+function exportAddressOverrides(){download(new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),addresses:addressOverrides},null,2)],{type:'application/json'}),`Corrections_adresses_${today()}.json`);}
+function importAddressOverrides(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);addressOverrides=Object.assign({},addressOverrides,x.addresses||x);localStorage.setItem('parage.addressOverrides',JSON.stringify(addressOverrides));renderAddressOverrides();toast('Corrections importées');}catch{toast('Fichier invalide')}};r.readAsText(f);}
+
+function archiveFinishedJob(job){const day=job.date||today();const key=`parage.dailyArchive.${day}`;let ids=JSON.parse(localStorage.getItem(key)||'[]');if(!ids.includes(job.id))ids.push(job.id);localStorage.setItem(key,JSON.stringify(ids));localStorage.setItem('parage.lastArchiveAt',new Date().toISOString());}
+function renderArchiveStatus(){const el=$('archiveStatus');if(!el)return;const days=Object.keys(localStorage).filter(k=>k.startsWith('parage.dailyArchive.')).sort().reverse();const total=days.reduce((n,k)=>n+JSON.parse(localStorage.getItem(k)||'[]').length,0);el.innerHTML=`<b>Archivage automatique actif</b> — ${total} chantier(s) conservé(s) dans l’application sur ${days.length} journée(s).`;}
+
+function pdfSafe(s){return String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7E]/g,' ');}
+function wrapPdf(text,max=88){const words=pdfSafe(text).split(/\s+/),out=[];let line='';for(const w of words){if((line+' '+w).trim().length>max){if(line)out.push(line);line=w}else line=(line+' '+w).trim()}if(line)out.push(line);return out;}
+function jobPdfLines(job){const c=calc(job),fl=Object.fromEntries(feet),lines=['GDS Gers Hautes-Pyrenees','PRO FORMA / COMPTE RENDU DE PARAGE',`Date : ${fmtDate(job.date)}  ${job.start||''}-${job.end||''}`,`Eleveur : ${job.clientName||''}`,`Cheptel : ${job.cheptel||''}`,`${job.address||''} ${job.cpVille||''}`,'',`Deplacement : ${euro(job.fee)} | Paires: ${c.pairs} x ${euro(c.pairRate)} | Pieds seuls: ${c.single} x ${euro(c.footRate)}`,`Pansements: ${c.band} | Talonnettes: ${c.blocks} | Total HT: ${euro(c.ht)} | TTC: ${euro(c.ttc)}`,'','BOVINS :'];for(const a of job.animals||[]){ensureWorkedFeet(a);const probs=[];const soins=new Set();for(const [k,d] of Object.entries(a.claws||{})){if((d.issues||[]).length)probs.push(`${k}: ${(d.issues||[]).join(', ')}`);for(const x of (d.care||[]))if(x==='Pansement'||x==='Talonnette')soins.add(x);}const line=`${a.number||'-'} | ${categoryLabels[a.category]||a.category||'-'} | ${(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')} | ${probs.join('; ')||'RAS'} | ${[...soins].join(', ')||'-'}${a.checkNext?' | A REVOIR':''}`;lines.push(...wrapPdf(line));}lines.push('',`Paiement: ${job.paymentTiming||''} - ${job.paymentMethod||''}`,'IBAN FR76 1690 6010 2003 4001 9914 139 - BIC AGRIFRPP869');return lines;}
+function makeSimplePdf(lines){const pages=[];for(let i=0;i<lines.length;i+=48)pages.push(lines.slice(i,i+48));const objs=[];objs[1]='<< /Type /Catalog /Pages 2 0 R >>';const pageIds=[],contentIds=[];let id=3;for(const pg of pages){pageIds.push(id++);contentIds.push(id++);}const fontId=id++;objs[2]=`<< /Type /Pages /Kids [${pageIds.map(x=>x+' 0 R').join(' ')}] /Count ${pages.length} >>`;objs[fontId]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';pages.forEach((pg,i)=>{const content=['BT','/F1 9 Tf','38 800 Td','11 TL'];pg.forEach((line,j)=>{const e=pdfSafe(line).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');content.push(`${j?'T* ':''}(${e}) Tj`)});content.push('ET');const stream=content.join('\n');objs[contentIds[i]]=`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;objs[pageIds[i]]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentIds[i]} 0 R >>`;});let pdf='%PDF-1.4\n';const offsets=[0];for(let i=1;i<objs.length;i++){offsets[i]=pdf.length;pdf+=`${i} 0 obj\n${objs[i]}\nendobj\n`;}const xref=pdf.length;pdf+=`xref\n0 ${objs.length}\n0000000000 65535 f \n`;for(let i=1;i<objs.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';pdf+=`trailer\n<< /Size ${objs.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;return new TextEncoder().encode(pdf);}
+function downloadAccountingZip(){const rows=selectedExportJobs();if(!rows.length)return toast('Aucun chantier sélectionné');const day=rows[0].date||today();const files=[{name:`Export_comptable_${day}.xls`,data:buildAccountingXml(rows)}];for(const j of rows){const safe=(j.cheptel||'sans_cheptel').replace(/[^a-zA-Z0-9_-]/g,'_');files.push({name:`Proformas/${safe}_${j.date}.pdf`,data:makeSimplePdf(jobPdfLines(j))});}download(zipStore(files),`Compta_parage_${day}.zip`);rows.forEach(j=>j.exportedAt=new Date().toISOString());saveAll();renderExports();toast(`ZIP compta créé avec ${rows.length} PDF`);}
 
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', e => {
