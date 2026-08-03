@@ -22,7 +22,7 @@ const LOGO_DATA='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAuEAAADUCAYAAAAya
 
 const PAYMENT_HTML = `
 <div style="margin-top:20px;border:1px solid #cfd8d4;padding:12px;border-radius:10px;background:#f8fbf9">
-  <h3 style="margin:0 0 8px 0;color:#285c4d">Conditions de règlement</h3>
+  <h3 style="margin:0 0 8px 0;color:#b83278">Conditions de règlement</h3>
   <p style="margin:6px 0"><b>Paiement à 20 jours</b></p>
   <p style="margin:6px 0"><b>Par chèque</b> à l'ordre du GDS32 - 3 chemin de la caillaouère - 32000 AUCH</p>
   <p style="margin:6px 0"><b>Par espèces</b></p>
@@ -44,7 +44,8 @@ let settings = Object.assign({
   bandagePrice: 5,
   blockPrice: 15,
   businessName: 'GDS Gers Hautes-Pyrénées',
-  businessDetails: "GDS 32 - Gers Hautes-Pyrénées\n3 chemin de la caillaouère\n32000 AUCH"
+  businessDetails: "GDS 32 - Gers Hautes-Pyrénées\n3 chemin de la caillaouère\n32000 AUCH",
+  accountingEmail: ''
 }, JSON.parse(localStorage.getItem('parage.settings') || '{}'));
 let costs = JSON.parse(localStorage.getItem('parage.costs') || '{}');
 
@@ -536,17 +537,17 @@ function printProforma() {
       @page{size:A4;margin:8mm}
       *{box-sizing:border-box}
       body{font:9px Arial;margin:0;color:#222}
-      h1{font-size:16px;margin:0;color:#285c4d}
-      h2{font-size:12px;margin:7px 0 3px;color:#285c4d}
+      h1{font-size:16px;margin:0;color:#b83278}
+      h2{font-size:12px;margin:7px 0 3px;color:#b83278}
       p{margin:2px 0}
       table{width:100%;border-collapse:collapse;margin:4px 0}
       th,td{border:1px solid #999;padding:2.5px 3px;vertical-align:top;line-height:1.15}
-      th{background:#eef5f1}
+      th{background:#fdeaf3}
       .right{text-align:right}
       .top{display:flex;align-items:center;gap:10px;margin-bottom:5px}
       .top img{width:145px;max-height:42px;object-fit:contain}
       .twoCols{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:4px 0}
-      .box{border:1.5px solid #285c4d;padding:5px;border-radius:5px;min-height:62px}
+      .box{border:1.5px solid #b83278;padding:5px;border-radius:5px;min-height:62px}
       .muted{color:#555;font-size:8px}
       .summary{font-size:8.5px}
       .payment{border:1px solid #cfd8d4;padding:5px;margin-top:5px;font-size:8px}
@@ -589,6 +590,82 @@ function printProforma() {
     <script>window.onload=()=>window.print()<\/script>
     </body></html>`);
   w.document.close();
+}
+
+
+function selectedExportJobs() {
+  const ids = [...document.querySelectorAll('.expCheck:checked')].map(x => x.value);
+  return ids.length ? jobs.filter(j => ids.includes(j.id)) : jobs.filter(j => j.status === 'finished' && !j.exportedAt);
+}
+
+function compactProformaBody(job) {
+  const c = calc(job);
+  const footLabels = Object.fromEntries(feet);
+  const sideLabels = {Int:'interne', Ext:'externe'};
+  const animalRows = [];
+  for (const animal of job.animals || []) {
+    if (!hasAnimalContent(animal)) continue;
+    ensureWorkedFeet(animal);
+    const feetDone = (animal.workedFeet || []).map(code => footLabels[code] || code).join(', ') || '—';
+    const problems = [];
+    const careSet = new Set();
+    const notes = [];
+    for (const [key,d] of Object.entries(animal.claws || {})) {
+      const [footCode,side] = key.split('-');
+      if ((d.issues || []).length) problems.push(`${footLabels[footCode] || footCode} ${sideLabels[side] || side}: ${(d.issues || []).join(', ')}`);
+      for (const item of (d.care || [])) if (item === 'Pansement' || item === 'Talonnette') careSet.add(item);
+      if (d.note) notes.push(d.note);
+    }
+    if (animal.notes) notes.push(animal.notes);
+    if (animal.checkNext) notes.push('À contrôler à la prochaine visite');
+    animalRows.push(`<tr><td>${esc(animal.number||'—')}</td><td>${esc(categoryLabels[animal.category]||animal.category||'—')}</td><td>${esc(feetDone)}</td><td>${esc(problems.join(' ; ')||'—')}</td><td>${esc([...careSet].join(', ')||'—')}</td><td>${esc(notes.join(' ; ')||'—')}</td></tr>`);
+  }
+  return `<section class="proformaPage"><div class="pfTop"><img src="${LOGO_DATA}" alt="Logo GDS"><div><h1>FACTURE PRO FORMA / COMPTE RENDU DE PARAGE</h1><small>Document édité sur place</small></div></div><div class="pfCols"><div><b>GDS Gers Hautes-Pyrénées</b><br>${nl2br(settings.businessDetails)}</div><div><b>Éleveur :</b> ${esc(job.clientName)}<br><b>Cheptel :</b> ${esc(job.cheptel)}<br>${esc(job.address)}<br>${esc(job.cpVille)}<br><b>Date :</b> ${fmtDate(job.date)} ${job.start||''}${job.end?'–'+job.end:''}</div></div><table><tr><th>Prestation</th><th>Qté</th><th>Tarif HT</th><th>Total HT</th></tr><tr><td>Déplacement et mise en place</td><td>1</td><td>${euro(job.fee)}</td><td>${euro(job.fee)}</td></tr><tr><td>Paires de pieds</td><td>${c.pairs}</td><td>${euro(c.pairRate)}</td><td>${euro(c.pairs*c.pairRate)}</td></tr><tr><td>Pieds seuls</td><td>${c.single}</td><td>${euro(c.footRate)}</td><td>${euro(c.single*c.footRate)}</td></tr><tr><td>Pansements</td><td>${c.band}</td><td>${euro(c.bandageRate)}</td><td>${euro(c.band*c.bandageRate)}</td></tr><tr><td>Talonnettes</td><td>${c.blocks}</td><td>${euro(c.blockRate)}</td><td>${euro(c.blocks*c.blockRate)}</td></tr><tr><th colspan="3">Total HT</th><th>${euro(c.ht)}</th></tr><tr><th colspan="3">TVA ${settings.vat}%</th><th>${euro(c.ttc-c.ht)}</th></tr><tr><th colspan="3">Total TTC</th><th>${euro(c.ttc)}</th></tr></table><h2>Récapitulatif de l’intervention</h2><table><tr><th>N°</th><th>Catégorie</th><th>Pieds</th><th>Problèmes</th><th>Soins</th><th>Observation</th></tr>${animalRows.join('')||'<tr><td colspan="6">Aucun bovin enregistré.</td></tr>'}</table><p><b>Modalité :</b> ${esc(job.paymentTiming||'À réception')} — <b>Mode :</b> ${esc(job.paymentMethod||'Chèque')}</p><p class="small">Paiement à 20 jours · IBAN FR76 1690 6010 2003 4001 9914 139 · BIC AGRIFRPP869</p></section>`;
+}
+
+function fullProformaDocument(rows, autoPrint=false) {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Pro formas parage</title><style>@page{size:A4;margin:7mm}*{box-sizing:border-box}body{font:8px Arial;color:#4a2638;margin:0}.proformaPage{page-break-after:always;min-height:275mm}.proformaPage:last-child{page-break-after:auto}.pfTop{display:flex;align-items:center;gap:10px}.pfTop img{width:140px;max-height:40px;object-fit:contain}h1{font-size:14px;color:#b83278;margin:0}h2{font-size:11px;color:#b83278;margin:5px 0 2px}.pfCols{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:5px 0}.pfCols>div{border:1px solid #b83278;border-radius:4px;padding:4px;min-height:55px}table{width:100%;border-collapse:collapse;margin:4px 0}th,td{border:1px solid #a98294;padding:2px;vertical-align:top;line-height:1.1}th{background:#fdeaf3}.small{font-size:7px}</style></head><body>${rows.map(compactProformaBody).join('')}${autoPrint?'<script>window.onload=()=>window.print()<\\/script>':''}</body></html>`;
+}
+
+function printSelectedProformas() {
+  const rows = selectedExportJobs();
+  if (!rows.length) return toast('Aucun chantier sélectionné');
+  const w = open('', '_blank');
+  w.document.write(fullProformaDocument(rows, true));
+  w.document.close();
+}
+
+function buildAccountingXml(rows) {
+  const headers = ['mois intervention','Date','Cheptel','Nom PRENOM','Adresse','CP + VILLE','Race','taureau fait  ?','DEPARTEMENT','FORFAIT + MISE EN PLACE','NBR Animaux totaux','NBR DE PAIRE','PIED à l\'unité','NBR DE PANSEMENT','NBR DE TALONNETTE','MONTANT SOIN TOTAUX','PRIX HT','PRIX TTC','Commentaires','Devis','FACTURE LE','Réglé le','TYPE'];
+  let xml=`<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="saisie"><Table>${xmlRow(headers)}`;
+  for(const j of rows){const c=calc(j),month=j.date.slice(0,7)+'-01',comments=[j.comment,...(j.animals||[]).filter(a=>a.checkNext).map(a=>`À revoir ${a.number}`)].filter(Boolean).join(' | ');xml+=xmlRow([month,j.date,j.cheptel,j.clientName,j.address,j.cpVille,j.race,((j.animals||[]).some(a=>a.category==='T')?'oui':'non'),j.department,j.fee,c.n,c.pairs,c.single,c.band,c.blocks,c.careTotal,c.ht,c.ttc,comments,j.date,'','',`${j.paymentTiming||''} - ${j.paymentMethod||''}`]);}
+  return xml+'</Table></Worksheet></Workbook>';
+}
+
+function crc32(bytes){let table=crc32.table;if(!table){table=crc32.table=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?0xedb88320^(c>>>1):c>>>1;table[n]=c>>>0;}}let crc=0xffffffff;for(const b of bytes)crc=table[(crc^b)&255]^(crc>>>8);return (crc^0xffffffff)>>>0;}
+function u16(n){return new Uint8Array([n&255,(n>>>8)&255]);}function u32(n){return new Uint8Array([n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255]);}
+function concatBytes(parts){const len=parts.reduce((s,p)=>s+p.length,0),out=new Uint8Array(len);let o=0;for(const p of parts){out.set(p,o);o+=p.length;}return out;}
+function zipStore(files){const enc=new TextEncoder(),locals=[],centrals=[];let offset=0;for(const file of files){const name=enc.encode(file.name),data=typeof file.data==='string'?enc.encode(file.data):file.data,crc=crc32(data);const local=concatBytes([u32(0x04034b50),u16(20),u16(0x800),u16(0),u16(0),u16(0),u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0),name,data]);locals.push(local);const central=concatBytes([u32(0x02014b50),u16(20),u16(20),u16(0x800),u16(0),u16(0),u16(0),u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset),name]);centrals.push(central);offset+=local.length;}const centralData=concatBytes(centrals),end=concatBytes([u32(0x06054b50),u16(0),u16(0),u16(files.length),u16(files.length),u32(centralData.length),u32(offset),u16(0)]);return new Blob([...locals,centralData,end],{type:'application/zip'});}
+
+function downloadDayArchive() {
+  const rows = selectedExportJobs();
+  if (!rows.length) return toast('Aucun chantier à archiver');
+  const day = rows[0].date || today();
+  const files=[{name:`${day}/Export_comptable_${day}.xls`,data:buildAccountingXml(rows)},{name:`${day}/Sauvegarde_${day}.json`,data:JSON.stringify({jobs:rows,settings},null,2)}];
+  for(const job of rows){const safe=(job.cheptel||'sans_cheptel').replace(/[^a-zA-Z0-9_-]/g,'_');files.push({name:`${day}/${safe}/${job.date}_proforma_${safe}.html`,data:fullProformaDocument([job],false)});}
+  download(zipStore(files),`Archive_parage_${day}.zip`);
+  localStorage.setItem(`parage.archive.${day}`,JSON.stringify(rows.map(j=>j.id)));
+  toast('Archive du jour créée');
+}
+
+function prepareAccountingEmail() {
+  const rows=selectedExportJobs();
+  if(!rows.length)return toast('Aucun chantier sélectionné');
+  const email=settings.accountingEmail||'';
+  const day=rows[0].date||today();
+  const subject=encodeURIComponent(`Parage - export et pro formas du ${fmtDate(day)}`);
+  const body=encodeURIComponent(`Bonjour,\n\nVous trouverez l’archive des ${rows.length} chantier(s) de parage du ${fmtDate(day)}.\nTéléchargez d’abord l’archive depuis l’application puis joignez-la à ce message.\n\nCordialement`);
+  location.href=`mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`;
 }
 
 function toggleRateEditing(){const e=$('rateEditing');e.hidden=!e.hidden;$('editRatesBtn').textContent=e.hidden?'Modifier un tarif':'Masquer les tarifs';}
