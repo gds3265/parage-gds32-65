@@ -51,7 +51,7 @@ let settings = Object.assign({
 }, JSON.parse(localStorage.getItem('parage.settings') || '{}'));
 let costs = JSON.parse(localStorage.getItem('parage.costs') || '{}');
 let addressOverrides = JSON.parse(localStorage.getItem('parage.addressOverrides') || '{}');
-const APP_VERSION='2.0';
+const APP_VERSION='2.1';
 
 function saveAll() {
   localStorage.setItem('parage.jobs', JSON.stringify(jobs));
@@ -68,6 +68,7 @@ function showView(viewId) {
   document.querySelectorAll('#nav button').forEach(btn => btn.classList.toggle('active', btn.dataset.view === viewId));
   if (viewId === 'history') renderHistory();
   if (viewId === 'exports') renderExports();
+  if (viewId === 'accounting') renderAccounting();
   if (viewId === 'stats') renderStats();
   if (viewId === 'home') renderHome();
   if (viewId === 'addresses') renderAddressOverrides();
@@ -87,6 +88,7 @@ async function init() {
   bindClient();
   loadSettings();
   $('statsMonth').value = today().slice(0, 7);
+  if ($('accountingDate')) $('accountingDate').value = today();
   renderHome();
   newJob();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
@@ -133,8 +135,11 @@ function blankJob() {
     animals: [],
     status: 'draft',
     exportedAt: null,
-    paymentStatus: '',
+    paymentStatus: 'pending',
+    accountingSentAt: null,
     invoiceNo: '',
+    invoiceDate: '',
+    paidAt: '',
     createdAt: new Date().toISOString()
   };
 }
@@ -873,6 +878,7 @@ init = async function() {
   bindClient();
   loadSettings();
   $('statsMonth').value = today().slice(0, 7);
+  if ($('accountingDate')) $('accountingDate').value = today();
   renderHome();
   newJob();
   renderGeneratedFiles();
@@ -1069,5 +1075,85 @@ window.addEventListener('offline',updateSyncBadgeV20);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')retryPendingSyncV20();});
 setInterval(retryPendingSyncV20,60000);
 setTimeout(()=>{updateSyncBadgeV20();retryPendingSyncV20();},1200);
+
+
+/* ===== V2.1 : module Comptabilité ===== */
+function accountingStatus(job){
+  if(job.paymentStatus==='late') return ['late','Impayé / retard'];
+  if(job.paymentStatus==='paid'||job.paidAt) return ['paid','Réglé'];
+  if(job.paymentStatus==='invoiced'||job.invoiceNo) return ['invoiced','Facturé'];
+  if(job.accountingSentAt||job.exportedAt) return ['sent','Envoyé'];
+  return ['pending','À envoyer'];
+}
+
+function accountingJobsForDate(){
+  const d=($('accountingDate')&&$('accountingDate').value)||today();
+  return jobs.filter(j=>j.status==='finished'&&j.date===d).sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+}
+
+function renderAccounting(){
+  const arr=accountingJobsForDate();
+  const totals=arr.reduce((s,j)=>{const c=calc(j);s.n+=c.n;s.ht+=c.ht;s.ttc+=c.ttc;return s;},{n:0,ht:0,ttc:0});
+  if($('accountingCards')) $('accountingCards').innerHTML=card('Chantiers',arr.length)+card('Bovins',totals.n)+card('Total HT',euro(totals.ht))+card('Total TTC',euro(totals.ttc));
+  if(!$('accountingList')) return;
+  $('accountingList').innerHTML=arr.map(j=>{const c=calc(j),st=accountingStatus(j);return `<div class="row accountingRow">
+    <input type="checkbox" class="accountingCheck" value="${j.id}" ${st[0]==='pending'?'checked':''}>
+    <div class="grow"><b>${esc(j.start||'--:--')} — ${esc(j.clientName||j.cheptel)}</b><br><small>${esc(j.cheptel)} · ${c.n} bovin(s) · ${euro(c.ttc)} TTC</small></div>
+    <span class="status ${st[0]}">${st[1]}</span>
+    <label class="compactField">N° facture<input value="${esc(j.invoiceNo||'')}" onchange="updateAccountingJob('${j.id}','invoiceNo',this.value)"></label>
+    <select onchange="setAccountingStatus('${j.id}',this.value)">
+      <option value="pending" ${st[0]==='pending'?'selected':''}>À envoyer</option>
+      <option value="sent" ${st[0]==='sent'?'selected':''}>Envoyé</option>
+      <option value="invoiced" ${st[0]==='invoiced'?'selected':''}>Facturé</option>
+      <option value="paid" ${st[0]==='paid'?'selected':''}>Réglé</option>
+      <option value="late" ${st[0]==='late'?'selected':''}>Impayé / retard</option>
+    </select>
+    <button onclick="openStoredProformaForJob('${j.id}')">Pro forma</button>
+  </div>`}).join('')||'<div class="panel"><p>Aucun chantier validé à cette date.</p></div>';
+}
+
+function selectAllAccounting(){document.querySelectorAll('.accountingCheck').forEach(x=>x.checked=true);}
+function updateAccountingJob(id,key,value){const j=jobs.find(x=>x.id===id);if(!j)return;j[key]=value;if(key==='invoiceNo'&&value)j.paymentStatus='invoiced';saveAll();cloudBackup(false);renderAccounting();}
+function setAccountingStatus(id,status){const j=jobs.find(x=>x.id===id);if(!j)return;j.paymentStatus=status;if(status==='sent')j.accountingSentAt=j.accountingSentAt||new Date().toISOString();if(status==='paid')j.paidAt=new Date().toISOString();saveAll();cloudBackup(false);renderAccounting();renderPaymentAlert();}
+
+async function openStoredProformaForJob(jobId){
+  const recs=await idbGetAll();const rec=recs.filter(r=>r.kind==='proforma'&&r.jobId===jobId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
+  if(rec){openPdfPreview(rec.blob,rec.name);return;}
+  const j=jobs.find(x=>x.id===jobId);if(!j)return toast('Chantier introuvable');openPdfPreview(proformaPdfBlob(j),`Proforma_${j.cheptel}_${j.date}.pdf`);
+}
+
+async function sendAccountingDay(){
+  const ids=[...document.querySelectorAll('.accountingCheck:checked')].map(x=>x.value);
+  const rows=jobs.filter(j=>ids.includes(j.id));
+  if(!rows.length)return toast('Sélectionnez au moins un chantier');
+  const day=rows[0].date||today();
+  const files=[{name:`Export_comptable_${day}.xls`,data:buildAccountingXml(rows)}];
+  for(const j of rows){const safe=(j.cheptel||'sans_cheptel').replace(/[^a-zA-Z0-9_-]/g,'_');files.push({name:`Proformas/Proforma_${safe}_${j.date}.pdf`,data:new Uint8Array(await proformaPdfBlob(j).arrayBuffer())});}
+  const zip=zipStore(files), name=`Compta_parage_${day}.zip`;
+  await storeGeneratedFile(name,zip,'zip');
+  const file=new File([zip],name,{type:'application/zip'});
+  let shared=false;
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({title:`Parage ${fmtDate(day)}`,text:`${rows.length} chantier(s) de parage`,files:[file]});shared=true;}catch(e){}
+  }else{
+    download(zip,name);
+    toast('ZIP créé et conservé dans Fichiers générés');
+  }
+  if(shared){rows.forEach(j=>{j.accountingSentAt=new Date().toISOString();j.exportedAt=j.accountingSentAt;if(!j.paymentStatus||j.paymentStatus==='pending')j.paymentStatus='sent';});saveAll();cloudBackup(false);toast('Journée partagée à la comptabilité');}
+  renderAccounting();renderExports();
+}
+
+
+
+const renderHomeBaseV21 = renderHome;
+renderHome = function(){
+  const month=today().slice(0,7), monthJobs=jobs.filter(j=>j.date?.startsWith(month));
+  const counts=monthJobs.reduce((s,j)=>{const x=calc(j);s.n+=x.n;s.feet+=x.pairs*2+x.single;return s;},{n:0,feet:0});
+  const pending=jobs.filter(j=>j.status==='finished'&&!j.accountingSentAt&&!j.exportedAt).length;
+  const unpaid=jobs.filter(j=>['invoiced','late','partial'].includes(j.paymentStatus)&&!j.paidAt).length;
+  const review=new Set();
+  jobs.filter(j=>j.status==='finished').forEach(j=>(j.animals||[]).filter(a=>a.checkNext).forEach(a=>review.add(`${j.cheptel}-${a.number}`)));
+  if($('homeCards')) $('homeCards').innerHTML=card('Chantiers du mois',monthJobs.length)+card('Bovins',counts.n)+card('Pieds travaillés',counts.feet)+card('À envoyer',pending)+card('Bovins à contrôler',review.size)+card('Factures en attente',unpaid);
+};
 
 init();

@@ -22,3 +22,18 @@ header .appLogo{width:230px!important;height:82px!important;object-fit:contain!i
 .syncBadge.working{background:#eee7fb;color:#5b3d8e;border-color:#c7b5e8}
 .versionBadge{margin-left:0!important}
 @media(max-width:650px){header .appLogo{width:205px!important;height:75px!important;max-width:57vw!important}.headerStatus{gap:3px}.syncBadge{font-size:9px;padding:4px 6px}.versionBadge{font-size:10px}}
+
+/* ===== V2.1 identité visuelle et comptabilité ===== */
+header{min-height:118px;padding:12px 24px;background:#fff;gap:22px;overflow:hidden}
+header .appLogo{width:330px;height:96px;max-width:42vw;object-fit:contain;object-position:left center;display:block}
+.headerTitle{min-width:220px}.headerTitle h1{font-size:28px;color:#562139}.headerTitle small{font-size:14px}
+.headerStatus{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.versionBadge{background:#fff0f7;color:#a92869;border:1px solid #efb3d1;border-radius:999px;padding:7px 11px;font-weight:800}
+.accountingLegend{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.status.invoiced{background:#e7dcf7;color:#5e3881}.accountingRow{align-items:center}.accountingRow .compactField{max-width:145px}.accountingRow select{width:auto;min-width:140px}
+@media(max-width:750px){
+ header{min-height:88px;padding:8px 10px;gap:8px}
+ header .appLogo{width:205px;height:68px;max-width:58vw}
+ .headerTitle{display:none}.headerStatus{margin-left:auto;max-width:38vw}.syncBadge{font-size:10px;padding:5px 7px}.versionBadge{font-size:11px;padding:5px 7px}
+ .accountingRow .compactField{max-width:none;width:100%}.accountingRow select{width:100%}
+}
