@@ -259,7 +259,6 @@ function renderAnimals() {
           ? `<span class="animalSummary">${esc(doneSummary)}</span><button onclick="toggleAnimal('${animal.id}')">Modifier</button>`
           : `<input data-animal-number="${animal.id}" inputmode="numeric" autocomplete="off" placeholder="N° de travail" value="${esc(animal.number)}" oninput="updateAnimal('${animal.id}','number',this.value)">
              <select onchange="updateAnimal('${animal.id}','category',this.value)">${['V','Gén','JB','T','B'].map(x=>`<option value="${x}" ${animal.category===x?'selected':''}>${categoryLabels[x]}</option>`).join('')}</select>
-             <label><input type="checkbox" ${animal.checkNext ? 'checked' : ''} onchange="updateAnimal('${animal.id}','checkNext',this.checked)"> À vérifier</label>
              <button onclick="removeAnimal('${animal.id}')">Supprimer</button>`}
       </div>
       ${animal.collapsed ? '' : `
@@ -268,6 +267,7 @@ function renderAnimals() {
         <p class="hint">Cliquez sur « Pied fait » pour un pied seul. Cliquez sur un onglon uniquement pour enregistrer un problème ou un soin.</p>
         <div class="feet">${feet.map(f => footHTML(animal, f[0], f[1])).join('')}</div>
         <label>Observation générale<input value="${esc(animal.notes)}" onchange="updateAnimal('${animal.id}','notes',this.value)"></label>
+        <label class="checkNextBottom"><input type="checkbox" ${animal.checkNext ? 'checked' : ''} onchange="updateAnimal('${animal.id}','checkNext',this.checked)"> Bovin à contrôler à la prochaine visite</label>
         <div class="animalActions"><button class="primary big" onclick="completeAnimal('${animal.id}')">✓ Bovin terminé → suivant</button></div>
       `}
     `;
@@ -381,6 +381,7 @@ function renderTotals() {
   ];
   if ($('pricingSummary')) $('pricingSummary').innerHTML = `<table class="pricingTable"><tr><th>Prestation</th><th>Quantité</th><th>Tarif HT</th><th>Sous-total HT</th></tr>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${euro(r[2])}</td><td><b>${euro(r[3])}</b></td></tr>`).join('')}<tr class="pricingTotal"><th colspan="3">Total HT</th><th>${euro(c.ht)}</th></tr><tr class="pricingTotal"><th colspan="3">TVA ${settings.vat}%</th><th>${euro(c.ttc-c.ht)}</th></tr><tr class="pricingTotal"><th colspan="3">Total TTC</th><th>${euro(c.ttc)}</th></tr></table>`;
   $('jobTotals').innerHTML = `<span>Animaux <b>${c.n}</b></span><span>Paires <b>${c.pairs}</b></span><span>Pieds seuls <b>${c.single}</b></span><span>Pansements <b>${c.band}</b></span><span>Talonnettes <b>${c.blocks}</b></span><span>Total HT <b>${euro(c.ht)}</b></span><span>TTC <b>${euro(c.ttc)}</b></span>`;
+  if ($('finishJobBtn')) $('finishJobBtn').textContent = `Terminer le chantier (${c.n} bovin${c.n > 1 ? 's' : ''} fait${c.n > 1 ? 's' : ''})`;
 }
 function saveJob() {
   syncJob();
@@ -492,66 +493,99 @@ function printProforma() {
   syncJob();
   const c = calc();
   const footLabels = Object.fromEntries(feet);
-  const sideLabels = {Int:'Interne', Ext:'Externe'};
-  const detailRows = [];
+  const sideLabels = {Int:'interne', Ext:'externe'};
+  const rows = [];
+
   for (const animal of current.animals || []) {
+    if (!hasAnimalContent(animal)) continue;
     ensureWorkedFeet(animal);
-    const clawEntries = Object.entries(animal.claws || {}).filter(([_, d]) => d.touched || d.issues?.length || d.care?.length);
-    const feetWithDetail = new Set();
-    for (const [key, d] of clawEntries) {
+    const feetDone = (animal.workedFeet || []).map(code => footLabels[code] || code).join(', ') || '—';
+    const problemParts = [];
+    const careSet = new Set();
+    const noteParts = [];
+
+    for (const [key, d] of Object.entries(animal.claws || {})) {
       const [footCode, side] = key.split('-');
-      feetWithDetail.add(footCode);
-      detailRows.push(`<tr><td>${esc(animal.number)}</td><td>${esc(animal.category)}</td><td>${esc(footLabels[footCode] || footCode)}</td><td>${esc(sideLabels[side] || side)}</td><td>${esc((d.issues || []).join(', '))}</td><td>${esc((d.care || []).join(', '))}</td><td>${esc(d.note || '')}</td></tr>`);
-    }
-    for (const footCode of animal.workedFeet || []) {
-      if (!feetWithDetail.has(footCode)) {
-        detailRows.push(`<tr><td>${esc(animal.number)}</td><td>${esc(animal.category)}</td><td>${esc(footLabels[footCode] || footCode)}</td><td>—</td><td>—</td><td>Parage</td><td>—</td></tr>`);
+      if ((d.issues || []).length) {
+        problemParts.push(`${footLabels[footCode] || footCode} ${sideLabels[side] || side} : ${(d.issues || []).join(', ')}`);
       }
+      for (const item of (d.care || [])) {
+        if (item === 'Pansement' || item === 'Talonnette') careSet.add(item);
+      }
+      if (d.note) noteParts.push(d.note);
     }
+
+    if (animal.notes) noteParts.push(animal.notes);
+    if (animal.checkNext) noteParts.push('À contrôler à la prochaine visite');
+
+    rows.push(`<tr>
+      <td>${esc(animal.number || '—')}</td>
+      <td>${esc(categoryLabels[animal.category] || animal.category || '—')}</td>
+      <td>${esc(feetDone)}</td>
+      <td>${esc(problemParts.join(' ; ') || '—')}</td>
+      <td>${esc([...careSet].join(', ') || '—')}</td>
+      <td>${esc(noteParts.join(' ; ') || '—')}</td>
+    </tr>`);
   }
-  const details = detailRows.join('');
 
   const logoUrl = LOGO_DATA;
   const w = open('', '_blank');
   w.document.write(`
     <html><head><title>Pro forma ${current.cheptel}</title>
     <style>
-      body{font:11px Arial;margin:16px;color:#222}
-      h1,h2,h3{color:#285c4d}
-      table{width:100%;border-collapse:collapse;margin:7px 0}
-      th,td{border:1px solid #aaa;padding:4px;vertical-align:top}
+      @page{size:A4;margin:8mm}
+      *{box-sizing:border-box}
+      body{font:9px Arial;margin:0;color:#222}
+      h1{font-size:16px;margin:0;color:#285c4d}
+      h2{font-size:12px;margin:7px 0 3px;color:#285c4d}
+      p{margin:2px 0}
+      table{width:100%;border-collapse:collapse;margin:4px 0}
+      th,td{border:1px solid #999;padding:2.5px 3px;vertical-align:top;line-height:1.15}
       th{background:#eef5f1}
       .right{text-align:right}
-      .box{border:2px solid #285c4d;padding:12px;border-radius:10px}
-      .top{display:flex;align-items:center;gap:18px;margin-bottom:16px}
-      .top img{width:210px;max-height:60px;object-fit:contain}
-      .muted{color:#555}
+      .top{display:flex;align-items:center;gap:10px;margin-bottom:5px}
+      .top img{width:145px;max-height:42px;object-fit:contain}
+      .twoCols{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:4px 0}
+      .box{border:1.5px solid #285c4d;padding:5px;border-radius:5px;min-height:62px}
+      .muted{color:#555;font-size:8px}
+      .summary{font-size:8.5px}
+      .payment{border:1px solid #cfd8d4;padding:5px;margin-top:5px;font-size:8px}
+      .footer{font-size:7.5px;margin-top:4px}
+      .nowrap{white-space:nowrap}
     </style></head><body>
     <div class="top"><img src="${logoUrl}" alt="Logo GDS"><div><h1>FACTURE PRO FORMA / COMPTE RENDU DE PARAGE</h1><p class="muted">Document édité sur place</p></div></div>
-    <p><b>${esc(settings.businessName)}</b><br>${nl2br(settings.businessDetails)}</p>
-    <div class="box"><b>Élevage :</b> ${esc(current.clientName)}<br><b>Cheptel :</b> ${esc(current.cheptel)}<br>${esc(current.address)} — ${esc(current.cpVille)}<br><b>Date :</b> ${fmtDate(current.date)} · ${current.start || ''}–${current.end || ''}</div>
+
+    <div class="twoCols">
+      <div class="box"><b>GDS Gers Hautes-Pyrénées</b><br>${nl2br(settings.businessDetails)}</div>
+      <div class="box"><b>Éleveur :</b> ${esc(current.clientName)}<br><b>Cheptel :</b> ${esc(current.cheptel)}<br>${esc(current.address)}<br>${esc(current.cpVille)}<br><b>Date :</b> ${fmtDate(current.date)} ${current.start || ''}${current.end ? '–' + current.end : ''}</div>
+    </div>
+
     <h2>Prestations</h2>
     <table>
-      <tr><th>Prestation</th><th>Quantité</th><th>Tarif HT</th><th>Total HT</th></tr>
+      <tr><th>Prestation</th><th class="nowrap">Qté</th><th class="nowrap">Tarif HT</th><th class="nowrap">Total HT</th></tr>
       <tr><td>Déplacement et mise en place</td><td>1</td><td>${euro(current.fee)}</td><td>${euro(current.fee)}</td></tr>
       <tr><td>Paires de pieds</td><td>${c.pairs}</td><td>${euro(c.pairRate)}</td><td>${euro(c.pairs * c.pairRate)}</td></tr>
       <tr><td>Pieds à l'unité</td><td>${c.single}</td><td>${euro(c.footRate)}</td><td>${euro(c.single * c.footRate)}</td></tr>
       <tr><td>Pansements</td><td>${c.band}</td><td>${euro(c.bandageRate)}</td><td>${euro(c.band * c.bandageRate)}</td></tr>
       <tr><td>Talonnettes</td><td>${c.blocks}</td><td>${euro(c.blockRate)}</td><td>${euro(c.blocks * c.blockRate)}</td></tr>
-      
       <tr><th colspan="3" class="right">Total HT</th><th>${euro(c.ht)}</th></tr>
       <tr><th colspan="3" class="right">TVA ${settings.vat}%</th><th>${euro(c.ttc - c.ht)}</th></tr>
       <tr><th colspan="3" class="right">Total TTC</th><th>${euro(c.ttc)}</th></tr>
     </table>
+
     <h2>Récapitulatif de l'intervention</h2>
-    <p>${c.n} bovin(s), ${c.pairs} paire(s), ${c.single} pied(s) à l'unité, ${c.band} pansement(s), ${c.blocks} talonnette(s).</p>
+    <p class="summary">${c.n} bovin(s) · ${c.pairs} paire(s) · ${c.single} pied(s) à l'unité · ${c.band} pansement(s) · ${c.blocks} talonnette(s)</p>
     <table>
-      <tr><th>N° bovin</th><th>Cat.</th><th>Pied</th><th>Onglon</th><th>Problème</th><th>Soin</th><th>Observation</th></tr>
-      ${details || '<tr><td colspan="7">Aucun problème particulier enregistré.</td></tr>'}
+      <tr><th>N° bovin</th><th>Catégorie</th><th>Pieds réalisés</th><th>Problèmes rencontrés</th><th>Soins</th><th>Observation</th></tr>
+      ${rows.join('') || '<tr><td colspan="6">Aucun bovin enregistré.</td></tr>'}
     </table>
-    <p><b>Commentaire :</b> ${esc(current.comment || '')}</p>
-    <div style="margin-top:10px;border:1px solid #cfd8d4;padding:8px"><b>Modalité :</b> ${esc(current.paymentTiming||'À réception')} &nbsp; <b>Mode :</b> ${esc(current.paymentMethod||'Chèque')}<br>${PAYMENT_HTML}</div>
-    <p style="margin-top:14px"><i>Document pro forma établi sur place. La facture définitive sera émise par la comptabilité.</i></p>
+
+    ${current.comment ? `<p><b>Commentaire chantier :</b> ${esc(current.comment)}</p>` : ''}
+    <div class="payment"><b>Modalité :</b> ${esc(current.paymentTiming || 'À réception')} &nbsp; <b>Mode de règlement :</b> ${esc(current.paymentMethod || 'Chèque')}<br>
+      <b>Conditions :</b> Paiement à 20 jours — Chèque à l'ordre du GDS32, espèces ou virement.<br>
+      IBAN : FR76 1690 6010 2003 4001 9914 139 — BIC : AGRIFRPP869
+    </div>
+    <p class="footer"><i>Document pro forma établi sur place. La facture définitive sera émise par la comptabilité.</i></p>
     <script>window.onload=()=>window.print()<\/script>
     </body></html>`);
   w.document.close();
