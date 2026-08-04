@@ -285,6 +285,35 @@ function animalHistory(number) {
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
+function refreshAnimalHistoryV4(id) {
+  const animal=current.animals.find(x=>x.id===id);
+  if(!animal||!String(animal.number||'').trim())return;
+  renderAnimals();
+}
+
+function bovineHistoryBannerV4(animal,hist) {
+  const last=hist[0], flagged=!!last.animal.checkNext;
+  return `<div class="historyAlert bovineHistoryBanner"><div><b>🐄 Bovin déjà paré</b><br>Dernière intervention : <b>${fmtDate(last.date)}</b>${flagged?' <span class="reviewPill">⚠ À contrôler</span>':''}<br><small>${esc(summaryAnimal(last.animal))}</small></div><button type="button" onclick="openAnimalHistoryV4('${animal.id}')">Voir l’historique</button></div>`;
+}
+
+function previousFootInfoV4(animal,code) {
+  const hist=animalHistory(animal.number);if(!hist.length)return null;
+  const last=hist[0].animal;syncLegacyAnimal(last);ensureWorkedFeet(last);
+  if(!(last.workedFeet||[]).includes(code) && !Object.keys(last.claws||{}).some(k=>k.startsWith(code+'-')))return null;
+  const careSet=new Set(),issues=[];
+  for(const [k,d] of Object.entries(last.claws||{})){if(!k.startsWith(code+'-'))continue;(d.issues||[]).forEach(x=>issues.push(x));(d.care||[]).forEach(x=>careSet.add(x));}
+  return {date:hist[0].date,photo:(last.footPhotos?.[code]||[]).length>0,bandage:careSet.has('Pansement'),block:careSet.has('Talonnette'),issues};
+}
+
+function openAnimalHistoryV4(animalId) {
+  const animal=current.animals.find(x=>x.id===animalId);if(!animal)return;
+  const hist=animalHistory(animal.number);
+  const fl=Object.fromEntries(feet);
+  const overlay=document.createElement('div');overlay.className='detailBox animalHistoryOverlay';overlay.style.cssText='position:fixed;inset:4%;z-index:40;overflow:auto;box-shadow:0 0 0 9999px #000a';
+  overlay.innerHTML=`<div class="toolbar"><h3>Historique bovin ${esc(animal.number)}</h3><button id="closeAnimalHistory">Fermer</button></div>${hist.map(h=>{const a=h.animal;syncLegacyAnimal(a);ensureWorkedFeet(a);const detail=Object.entries(a.claws||{}).filter(([_,d])=>(d.issues||[]).length||(d.care||[]).length||d.note).map(([k,d])=>`<li><b>${esc(k)}</b> : ${esc([...(d.issues||[]),...(d.care||[])].join(', ')||d.note||'')}</li>`).join('');const photos=Object.values(a.footPhotos||{}).reduce((n,x)=>n+(Array.isArray(x)?x.length:0),0);return `<div class="historyVisit"><h4>${fmtDate(h.date)} ${a.checkNext?'<span class="reviewPill">À contrôler</span>':''}</h4><p><b>Pieds :</b> ${(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')||'Non précisés'}${photos?` · 📷 ${photos} photo${photos>1?'s':''}`:''}</p>${detail?`<ul>${detail}</ul>`:'<p>Aucun problème particulier enregistré.</p>'}${a.notes?`<p><b>Observation :</b> ${esc(a.notes)}</p>`:''}</div>`;}).join('')}`;
+  document.body.appendChild(overlay);overlay.querySelector('#closeAnimalHistory').onclick=()=>overlay.remove();
+}
+
 function renderAnimals() {
   $('animals').innerHTML = current.animals.length ? '' : '<p>Aucun bovin saisi.</p>';
   current.animals.forEach((animal, i) => {
@@ -299,12 +328,12 @@ function renderAnimals() {
         <strong>Bovin ${i + 1}${animal.number ? ' — ' + esc(animal.number) : ''}</strong>
         ${animal.collapsed
           ? `<span class="animalSummary">${esc(doneSummary)}</span><button onclick="toggleAnimal('${animal.id}')">Modifier</button>`
-          : `<input data-animal-number="${animal.id}" inputmode="numeric" autocomplete="off" placeholder="N° de travail" value="${esc(animal.number)}" oninput="updateAnimal('${animal.id}','number',this.value)">
+          : `<input data-animal-number="${animal.id}" inputmode="numeric" autocomplete="off" placeholder="N° de travail" value="${esc(animal.number)}" oninput="updateAnimal('${animal.id}','number',this.value)" onblur="refreshAnimalHistoryV4('${animal.id}')">
              <select onchange="updateAnimal('${animal.id}','category',this.value)">${['V','Gén','JB','T','B'].map(x=>`<option value="${x}" ${animal.category===x?'selected':''}>${categoryLabels[x]}</option>`).join('')}</select>
              <button onclick="removeAnimal('${animal.id}')">Supprimer</button>`}
       </div>
       ${animal.collapsed ? '' : `
-        ${hist.length ? `<div class="historyAlert"><b>Historique trouvé</b> — dernier passage ${fmtDate(hist[0].date)} : ${summaryAnimal(hist[0].animal)}</div>` : ''}
+        ${hist.length ? bovineHistoryBannerV4(animal,hist) : ''}
         <div class="quickGroups"><div class="quickGroup"><b>1 paire</b><button class="${animal.workedFeet.includes('PAvG')&&animal.workedFeet.includes('PAvD')?'on':''}" onclick="setWorkedFeet('${animal.id}',['PAvG','PAvD'],true)">Antérieurs</button><button class="${animal.workedFeet.includes('PArG')&&animal.workedFeet.includes('PArD')?'on':''}" onclick="setWorkedFeet('${animal.id}',['PArG','PArD'],true)">Postérieurs</button></div><div class="quickGroup"><b>2 paires</b><button class="${animal.workedFeet.length===4?'on':''}" onclick="setWorkedFeet('${animal.id}',['PAvG','PAvD','PArG','PArD'],true)">4 pieds</button></div><div class="quickGroup oneFeet"><b>1 pied</b>${quickFootButtons.map(([code,label])=>`<button class="${animal.workedFeet.includes(code)?'on':''}" onclick="setWorkedFeet('${animal.id}',['${code}'],true)">${label}</button>`).join('')}</div><button onclick="setWorkedFeet('${animal.id}',['PAvG','PAvD','PArG','PArD'],false)">Effacer</button></div>
         <p class="hint">Cliquez sur « Pied fait » pour un pied seul. Cliquez sur un onglon uniquement pour enregistrer un problème ou un soin.</p>
         <div class="feet">${feet.map(f => footHTML(animal, f[0], f[1])).join('')}</div>
@@ -1933,3 +1962,104 @@ function installHistoryControlsV331(){
 }
 installHistoryControlsV331();
 setTimeout(()=>{installHistoryControlsV331();purgeExpiredTrashV331();},1200);
+
+/* =====================================================================
+   V4.0 PRODUCTION — Photos par pied + journal d'activité
+   ===================================================================== */
+const APP_VERSION_V4='4.0';
+let auditLogs=JSON.parse(localStorage.getItem('parage.auditLogs')||'[]');
+
+function currentUserLabelV4(){return currentProfile?.email||authSession?.user?.email||'Utilisateur local';}
+function logActionV4(type,action,job=null,details=''){
+  const target=job||current||{};
+  auditLogs.unshift({id:uid(),at:new Date().toISOString(),type,action,user:currentUserLabelV4(),cheptel:target.cheptel||'',farm:target.clientName||'',jobId:target.id||'',details:details||''});
+  auditLogs=auditLogs.slice(0,5000);
+  localStorage.setItem('parage.auditLogs',JSON.stringify(auditLogs));
+}
+
+const saveAllV4Base=saveAll;
+saveAll=function(){saveAllV4Base();localStorage.setItem('parage.auditLogs',JSON.stringify(auditLogs));};
+
+const syncLegacyAnimalV4Base=syncLegacyAnimal;
+syncLegacyAnimal=function(a){a=syncLegacyAnimalV4Base(a);if(!a.footPhotos||typeof a.footPhotos!=='object')a.footPhotos={};return a;};
+
+function footPhotosV4(animal,code){syncLegacyAnimal(animal);if(!Array.isArray(animal.footPhotos[code]))animal.footPhotos[code]=[];return animal.footPhotos[code];}
+function resizePhotoV4(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{
+      const img=new Image();img.onerror=reject;img.onload=()=>{
+        const max=1100,scale=Math.min(1,max/Math.max(img.width,img.height));
+        const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));
+        canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL('image/jpeg',0.72));
+      };img.src=reader.result;
+    };reader.readAsDataURL(file);
+  });
+}
+async function addFootPhotoV4(animalId,code){
+  const input=document.createElement('input');input.type='file';input.accept='image/*';input.setAttribute('capture','environment');
+  input.onchange=async()=>{
+    const file=input.files?.[0];if(!file)return;
+    try{
+      const data=await resizePhotoV4(file),animal=current.animals.find(a=>a.id===animalId);if(!animal)return;
+      const photos=footPhotosV4(animal,code);photos.push({id:uid(),data,name:file.name||'photo.jpg',createdAt:new Date().toISOString()});
+      ensureWorkedFeet(animal);if(!animal.workedFeet.includes(code))animal.workedFeet.push(code);
+      saveDraftSilently();renderAnimals();toast('Photo ajoutée au pied');
+    }catch(e){toast('Impossible d’ajouter la photo');}
+  };
+  input.click();
+}
+function removeFootPhotoV4(animalId,code,photoId){
+  const animal=current.animals.find(a=>a.id===animalId);if(!animal)return;
+  animal.footPhotos[code]=footPhotosV4(animal,code).filter(p=>p.id!==photoId);saveDraftSilently();renderAnimals();
+}
+function openFootPhotoV4(animalId,code,photoId){
+  const animal=current.animals.find(a=>a.id===animalId),p=animal&&footPhotosV4(animal,code).find(x=>x.id===photoId);if(!p)return;
+  const overlay=document.createElement('div');overlay.className='detailBox';overlay.style.cssText='position:fixed;inset:3%;z-index:30;overflow:auto;box-shadow:0 0 0 9999px #000b;text-align:center';
+  overlay.innerHTML=`<div class="toolbar"><h3>Photo — ${Object.fromEntries(feet)[code]||code}</h3><button id="closePhoto">Fermer</button></div><img src="${p.data}" style="max-width:100%;max-height:75vh;border-radius:12px"><p><small>${fmtDate((p.createdAt||'').slice(0,10))}</small></p>`;
+  document.body.appendChild(overlay);overlay.querySelector('#closePhoto').onclick=()=>overlay.remove();
+}
+
+footHTML=function(animal,code,label){
+  ensureWorkedFeet(animal);const worked=animal.workedFeet.includes(code),photos=footPhotosV4(animal,code),previous=previousFootInfoV4(animal,code);
+  const previousIcons=previous?`${previous.photo?'📷 ':''}${previous.bandage?'🩹 ':''}${previous.block?'◼️ ':''}`:'';
+  return `<div class="foot ${worked?'worked':''} ${previous?'previousFoot':''}"><h4>${label}${previous?` <span class="previousFootMark" title="Pied traité le ${fmtDate(previous.date)}">↶ ${fmtDate(previous.date)} ${previousIcons}</span>`:''}</h4><button class="footDone ${worked?'on':''}" onclick="toggleFoot('${animal.id}','${code}')">${worked?'✓ Pied fait':'Marquer le pied fait'}</button><div class="claws">${['Int','Ext'].map(side=>{const key=code+'-'+side,d=animal.claws[key]||{},cls=(d.issues?.length||d.care?.length)?'problem':'';return `<button class="claw ${cls}" onclick="editClaw('${animal.id}','${key}')"><b>${side==='Int'?'Interne':'Externe'}</b><br><small>${[...(d.issues||[]),...(d.care||[])].slice(0,2).join(', ')||'Ajouter un problème'}</small></button>`;}).join('')}</div><div class="footPhotoBar"><button type="button" class="photoBtn" onclick="addFootPhotoV4('${animal.id}','${code}')">📷 Photo du pied</button>${photos.length?`<span class="photoCount">${photos.length} photo${photos.length>1?'s':''}</span>`:''}</div><div class="footPhotos">${photos.map(p=>`<div class="footPhoto"><img src="${p.data}" alt="Photo du pied" onclick="openFootPhotoV4('${animal.id}','${code}','${p.id}')"><button type="button" title="Supprimer" onclick="event.stopPropagation();removeFootPhotoV4('${animal.id}','${code}','${p.id}')">×</button></div>`).join('')}</div></div>`;
+};
+
+function renderAuditLog(){
+  if(!$('journalList'))return;
+  const q=($('journalSearch')?.value||'').toLowerCase(),start=$('journalStart')?.value||'',end=$('journalEnd')?.value||'',type=$('journalType')?.value||'';
+  const rows=auditLogs.filter(x=>(!start||x.at.slice(0,10)>=start)&&(!end||x.at.slice(0,10)<=end)&&(!type||x.type===type)&&(!q||[x.user,x.action,x.cheptel,x.farm,x.details].join(' ').toLowerCase().includes(q)));
+  $('journalList').innerHTML=rows.map(x=>`<div class="auditRow"><div><b>${new Date(x.at).toLocaleDateString('fr-FR')}</b><br><small>${new Date(x.at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</small></div><div>${esc(x.user)}</div><div class="auditType">${esc(x.type)}</div><div><b>${esc(x.action)}</b>${x.cheptel||x.farm?`<br><small>${esc(x.cheptel)} ${esc(x.farm)}</small>`:''}${x.details?`<br><small>${esc(x.details)}</small>`:''}</div></div>`).join('')||'<p>Aucune action trouvée.</p>';
+}
+function exportAuditLog(){
+  const rows=[['Date','Heure','Utilisateur','Type','Action','Cheptel','Exploitation','Détails'],...auditLogs.map(x=>[x.at.slice(0,10),new Date(x.at).toLocaleTimeString('fr-FR'),x.user,x.type,x.action,x.cheptel,x.farm,x.details])];
+  const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n');download(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),`Journal_activite_${today()}.csv`);
+}
+
+const showViewV4Base=showView;
+showView=function(viewId){const r=showViewV4Base(viewId);if(viewId==='journal')renderAuditLog();return r;};
+
+const saveJobV4Base=saveJob;
+saveJob=function(){const wasNew=!jobs.some(x=>x.id===current?.id);const result=saveJobV4Base();if(current?.cheptel)logActionV4('Chantier',wasNew?'Chantier créé':'Chantier modifié',current,`${(current.animals||[]).filter(hasAnimalContent).length} bovin(s)`);return result;};
+const finishJobV4Base=finishJob;
+finishJob=function(){const snapshot=current?JSON.parse(JSON.stringify(current)):null;const result=finishJobV4Base();if(snapshot)logActionV4('Chantier','Chantier validé',snapshot,`Fin ${snapshot.end||nowTime()}`);return result;};
+const updateAccountingJobV4Base=updateAccountingJob;
+updateAccountingJob=function(id,key,value){const j=jobs.find(x=>x.id===id),old=j?.[key];const r=updateAccountingJobV4Base(id,key,value);if(j&&old!==value)logActionV4('Comptabilité',`Mise à jour ${key}`,j,String(value||''));return r;};
+const saveAddressOverrideV4Base=saveAddressOverride;
+saveAddressOverride=function(silent=false){const before=JSON.stringify(addressOverrides[current?.cheptel]||null);const r=saveAddressOverrideV4Base(silent);const after=JSON.stringify(addressOverrides[current?.cheptel]||null);if(before!==after&&current?.cheptel)logActionV4('Adresse','Adresse corrigée',current,current.cpVille||'');return r;};
+const saveSettingsV4Base=saveSettings;
+saveSettings=function(){const r=saveSettingsV4Base();logActionV4('Paramètres','Paramètres enregistrés',null,'');return r;};
+
+const backupDataV4Base=backupData;
+backupData=function(){download(new Blob([JSON.stringify({jobs,settings,costs,addressOverrides,auditLogs,version:APP_VERSION_V4},null,2)],{type:'application/json'}),`Sauvegarde_parage_V4_${today()}.json`);logActionV4('Synchronisation','Sauvegarde manuelle exportée');};
+
+const sharedPayloadV4Base=sharedPayload;
+sharedPayload=function(){return Object.assign({},sharedPayloadV4Base(),{auditLogs,version:APP_VERSION_V4});};
+
+function updateV4Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0');document.title='Suivi Parage v4.0';
+  const start=$('journalStart'),end=$('journalEnd');if(start&&!start.value){const d=new Date();d.setDate(d.getDate()-30);start.value=d.toISOString().slice(0,10);}if(end&&!end.value)end.value=today();
+}
+updateV4Identity();
+setTimeout(updateV4Identity,500);

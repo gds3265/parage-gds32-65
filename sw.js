@@ -1,5 +1,5 @@
-const C='parage-v3-3-1';
-const FILES=['./','index.html?v=3.3','style.css?v=3.3','app.js?v=3.3','manifest.json','app-logo.png','icon-192.png','icon-512.png','apple-touch-icon.png','favicon.png','assets/logo-gds.png','assets/logo-gds.jpg','clients.json'];
+const C='parage-v4-0-history';
+const FILES=['./','index.html?v=3.3','style.css?v=3.3','app.js?v=4.0','manifest.json','app-logo.png','icon-192.png','icon-512.png','apple-touch-icon.png','favicon.png','assets/logo-gds.png','assets/logo-gds.jpg','clients.json'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(FILES)))});
 self.addEventListener('activate',e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==C).map(k=>caches.delete(k))))])));
 self.addEventListener('fetch',e=>{
