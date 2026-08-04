@@ -1,7 +1,7 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#b83278"><link rel="manifest" href="manifest.json?v=3.2"><link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=3.2"><link rel="icon" type="image/png" href="favicon.png?v=3.2"><link rel="stylesheet" href="style.css?v=3.2"><title>Suivi Parage</title></head><body>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#b83278"><link rel="manifest" href="manifest.json?v=3.3"><link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=3.3"><link rel="icon" type="image/png" href="favicon.png?v=3.3"><link rel="stylesheet" href="style.css?v=3.3"><title>Suivi Parage</title></head><body>
 <div id="loginScreen" class="loginScreen">
   <div class="loginCard">
-    <img src="app-logo.png?v=3.0" alt="Suivi Parage">
+    <img src="app-logo.png?v=3.3" alt="Suivi Parage">
     <h1>Suivi Parage</h1>
     <p>Connexion sécurisée</p>
     <div id="cloudConfigBox" class="cloudConfigBox" hidden>
@@ -16,13 +16,22 @@
     <div id="loginMessage" class="loginMessage"></div>
   </div>
 </div>
-<header>
-  <img class="appLogo" src="app-logo.png?v=3.2" alt="Suivi Parage">
+<header class="compactHeader">
+  <img class="appLogo" src="app-logo.png?v=3.3" alt="Suivi Parage">
   <div class="headerTitle"><h1>Suivi Parage</h1><small>Chantiers, historique, pro forma et comptabilité</small></div>
-  <div class="headerStatus"><span id="userBadge" class="userBadge"></span><button id="logoutBtn" class="logoutBtn" onclick="signOut()" hidden>Déconnexion</button><span id="syncBadge" class="syncBadge pending">Enregistré localement</span><span class="versionBadge">v3.2</span></div>
+  <div class="modeSwitch" id="modeSwitch" hidden>
+    <button id="terrainModeBtn" type="button" onclick="setUIMode('terrain')">Terrain</button>
+    <button id="officeModeBtn" type="button" onclick="setUIMode('office')">Bureau</button>
+  </div>
+  <div class="headerStatus">
+    <span id="syncBadge" class="syncBadge pending">Local</span>
+    <span class="versionBadge">v3.3</span>
+    <span id="userBadge" class="userBadge"></span>
+    <button id="logoutBtn" class="logoutBtn" onclick="signOut()" hidden>Déconnexion</button>
+  </div>
   <button id="installBtn" hidden>Installer</button>
 </header>
-<nav id="nav"><button data-view="home" class="active" data-roles="admin,pareuse,comptable,technicien">Accueil</button><button data-view="chantier" data-roles="admin,pareuse">Nouveau chantier</button><button data-view="history" data-roles="admin,pareuse,comptable,technicien">Historique</button><button data-view="accounting" data-roles="admin,pareuse,comptable,technicien">Comptabilité</button><button data-view="exports" data-roles="admin,pareuse,comptable">Fichiers</button><button data-view="stats" data-roles="admin,pareuse,comptable,technicien">Bilans</button><button data-view="addresses" data-roles="admin">Adresses</button><button data-view="users" data-roles="admin">Utilisateurs</button><button data-view="settings" data-roles="admin">Paramètres</button></nav>
+<nav id="nav"><button data-view="home" class="active" data-modes="terrain,office" data-roles="admin,pareuse,comptable,technicien">Accueil</button><button data-view="chantier" data-modes="terrain,office" data-roles="admin,pareuse">Nouveau chantier</button><button data-view="history" data-modes="terrain,office" data-roles="admin,pareuse,comptable,technicien">Historique</button><button data-view="accounting" data-modes="office" data-roles="admin,pareuse,comptable,technicien">Comptabilité</button><button data-view="exports" data-modes="terrain,office" data-roles="admin,pareuse,comptable">Fichiers</button><button data-view="stats" data-modes="office" data-roles="admin,pareuse,comptable,technicien">Bilans</button><button data-view="addresses" data-modes="office" data-roles="admin">Adresses</button><button data-view="users" data-modes="office" data-roles="admin">Utilisateurs</button><button data-view="settings" data-modes="office" data-roles="admin">Paramètres</button></nav>
 <main>
 <section id="home" class="view active"><div class="hero"><h2>Bonjour</h2><p>Créez un chantier, saisissez les bovins sur le schéma des pieds, puis éditez la pro forma et l'export comptable.</p><button class="primary big" onclick="showView('chantier')">Démarrer un chantier</button></div><div id="homeCards" class="cards"></div></section>
 <section id="chantier" class="view">
@@ -97,4 +106,4 @@
 <section id="addresses" class="view"><div class="toolbar"><h2>Corrections d’adresses</h2><button onclick="exportAddressOverrides()">Exporter les adresses saisies</button><label class="fileBtn">Mise à jour base adresses<input type="file" accept=".json,.csv,text/csv,application/json" onchange="importAddressBase(event)"></label></div><p class="hint">Les adresses saisies à la main restent prioritaires. Une mise à jour de la base clients ne les remplace pas.</p><div id="addressOverrideList"></div></section>
 <section id="users" class="view"><div class="toolbar"><h2>Utilisateurs</h2><button onclick="refreshUsers()">Actualiser</button></div><div class="panel"><p>Les comptes sont créés dans Supabase Authentication. Ici, l’administratrice attribue ensuite le rôle correspondant.</p><div id="usersList"></div></div></section>
 <section id="settings" class="view"><h2>Paramètres</h2><div class="panel grid2"><label>TVA (%)<input id="vat" type="number" step="0.01"></label><label>Forfait par défaut (€ HT)<input id="defaultFee" type="number" step="0.01"></label><label>Paire de pieds, 1 bovin (€ HT)<input id="pairOne" type="number" step="0.01"></label><label>Paire de pieds, ≥2 bovins (€ HT)<input id="pairMany" type="number" step="0.01"></label><label>Pied à l'unité, 1 bovin (€ HT)<input id="footOne" type="number" step="0.01"></label><label>Pied à l'unité, ≥2 bovins (€ HT)<input id="footMany" type="number" step="0.01"></label><label>Pansement (€ HT)<input id="bandagePrice" type="number" step="0.01"></label><label>Talonnette (€ HT)<input id="blockPrice" type="number" step="0.01"></label><label>Nom / entreprise<input id="businessName"></label><label>Coordonnées<textarea id="businessDetails"></textarea></label><label>Email comptabilité<input id="accountingEmail" type="email" placeholder="comptabilite@exemple.fr"></label><label>URL Supabase (sauvegarde en ligne)<input id="supabaseUrl" placeholder="https://xxxx.supabase.co"></label><label>Clé publique Supabase<input id="supabaseKey" type="password" placeholder="anon public key"></label><label>Point de départ des tournées<input id="defaultRouteStart" value="Pontis-de-Rivière (31)"></label><label>Coût kilométrique par défaut (€ / km)<input id="defaultKmRate" type="number" step="0.01" value="0.65"></label></div><button class="primary" onclick="saveSettings()">Enregistrer les paramètres</button><div class="panel"><h3>Sauvegarde</h3><button onclick="backupData()">Exporter une sauvegarde</button><button onclick="cloudBackup(true)">Synchroniser maintenant</button><button onclick="cloudRestore()">Restaurer depuis la sauvegarde en ligne</button><label class="fileBtn">Importer une sauvegarde<input type="file" accept="application/json" onchange="restoreData(event)"></label></div></section>
-</main><div id="toast"></div><script src="app.js?v=3.2"></script></body></html>
+</main><div id="toast"></div><script src="app.js?v=3.3"></script></body></html>

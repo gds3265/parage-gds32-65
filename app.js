@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=3.1.2');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=3.3');
 }
 
 function bindClient() {
@@ -1193,7 +1193,7 @@ renderHome = function(){
 /* =====================================================================
    V3.0 — Connexion Supabase, rôles et base partagée
    ===================================================================== */
-const APP_VERSION_FINAL = '3.2';
+const APP_VERSION_FINAL = '3.3';
 const DEFAULT_SUPABASE_URL = 'https://kwbkqdkzdrjoxpzvfztg.supabase.co';
 let authSession = JSON.parse(localStorage.getItem('parage.authSession') || 'null');
 let currentProfile = null;
@@ -1490,7 +1490,7 @@ async function secureInit(){
   $('loginSupabaseUrl').value=localStorage.getItem('parage.supabaseUrl')||DEFAULT_SUPABASE_URL;
   $('loginSupabaseKey').value=localStorage.getItem('parage.supabaseKey')||'';
   await init();
-  document.querySelector('.versionBadge').textContent='v3.1.2';
+  document.querySelector('.versionBadge').textContent='v3.3';
   if(authSession?.access_token){
     try{await loadCurrentProfile();await enterApplication();return;}catch(e){if(!(await refreshAuthSession())){authSession=null;localStorage.removeItem('parage.authSession');}else{try{await loadCurrentProfile();await enterApplication();return;}catch{}}}
   }
@@ -1736,3 +1736,68 @@ saveCosts=function(){
   const co=routeCostObjectV32(),routeMeta={routeMode:co.routeMode,routeDuration:co.routeDuration,routeDetails:co.routeDetails,routeWarnings:co.routeWarnings,autoSignature:co.autoSignature,routeUpdatedAt:co.routeUpdatedAt};
   saveCostsBaseV32();Object.assign(routeCostObjectV32(),routeMeta);saveRouteCostObjectV32();renderStats();
 };
+
+/* =====================================================================
+   V3.3 — Mode Terrain / Bureau et navigation par rôle
+   ===================================================================== */
+const APP_VERSION_UI='3.3';
+let uiMode=localStorage.getItem('parage.uiMode')||'terrain';
+
+function roleCanChooseMode(){return ['admin','pareuse','technicien'].includes(role());}
+function defaultModeForRole(){return role()==='comptable'?'office':'terrain';}
+function allowedInMode(el,mode){
+  const modes=(el.dataset.modes||'terrain,office').split(',');
+  return modes.includes(mode);
+}
+function firstVisibleView(){
+  const btn=[...document.querySelectorAll('#nav button')].find(b=>!b.classList.contains('hiddenByRole')&&!b.classList.contains('hiddenByMode'));
+  return btn?.dataset.view||'home';
+}
+function applyModeUI(redirect=true){
+  if(!roleCanChooseMode())uiMode=defaultModeForRole();
+  document.body.classList.toggle('mode-terrain',uiMode==='terrain');
+  document.body.classList.toggle('mode-office',uiMode==='office');
+  const sw=$('modeSwitch');if(sw)sw.hidden=!roleCanChooseMode();
+  if($('terrainModeBtn'))$('terrainModeBtn').classList.toggle('active',uiMode==='terrain');
+  if($('officeModeBtn'))$('officeModeBtn').classList.toggle('active',uiMode==='office');
+  document.querySelectorAll('#nav button').forEach(btn=>btn.classList.toggle('hiddenByMode',!allowedInMode(btn,uiMode)));
+  localStorage.setItem('parage.uiMode',uiMode);
+  if(redirect){
+    const active=document.querySelector('.view.active');
+    const nav=active&&document.querySelector(`#nav button[data-view="${active.id}"]`);
+    if(!nav||nav.classList.contains('hiddenByRole')||nav.classList.contains('hiddenByMode'))showView(firstVisibleView());
+  }
+}
+function setUIMode(mode){
+  if(!['terrain','office'].includes(mode))return;
+  if(!roleCanChooseMode()&&mode!=='office')return;
+  uiMode=mode;applyModeUI(true);
+  toast(mode==='terrain'?'Mode Terrain activé':'Mode Bureau activé');
+}
+
+const applyRoleUIV33=applyRoleUI;
+applyRoleUI=function(){
+  applyRoleUIV33();
+  if(!roleCanChooseMode())uiMode=defaultModeForRole();
+  applyModeUI(false);
+};
+
+const showViewV33=showView;
+showView=function(viewId){
+  const nav=document.querySelector(`#nav button[data-view="${viewId}"]`);
+  if(nav&&nav.classList.contains('hiddenByMode')){toast('Passez en mode Bureau pour accéder à ce module');return;}
+  return showViewV33(viewId);
+};
+
+const enterApplicationV33=enterApplication;
+enterApplication=async function(){
+  await enterApplicationV33();
+  if(!localStorage.getItem('parage.uiMode'))uiMode=defaultModeForRole();
+  applyModeUI(true);
+};
+
+function updateV33Labels(){
+  const v=document.querySelector('.versionBadge');if(v)v.textContent='v'+APP_VERSION_UI;
+  document.title='Suivi Parage v'+APP_VERSION_UI;
+}
+updateV33Labels();

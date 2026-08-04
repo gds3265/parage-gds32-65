@@ -59,3 +59,38 @@ header .appLogo{width:330px;height:96px;max-width:42vw;object-fit:contain;object
 @media(max-width:600px){.chantierStart{margin:14px auto;padding:34px 18px}.chantierStart h2{font-size:25px}.startJobButton{font-size:17px}}
 /* V3.2 - tournée automatique et données */
 .routeActions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.routeEstimateStatus{padding:11px 13px;border:1px solid #e7bfd2;background:#fff8fb;border-radius:10px;margin:10px 0;color:#694052}.routeEstimateStatus.loading{border-color:#d59a30;background:#fff8e8}.routeEstimateStatus.success{border-color:#67a879;background:#eef9f1;color:#245e33}.routeEstimateStatus.manual{border-color:#a3a7b0;background:#f5f6f8}.routeEstimateStatus.error{border-color:#c65a55;background:#fff0ef;color:#8b2925}.routeTableWrap{overflow:auto;max-height:320px}.routeWarnings{margin-top:9px;padding:10px;border-left:4px solid #d59a30;background:#fff8e8}.miniBars{display:grid;gap:8px}.miniBarRow{display:grid;grid-template-columns:70px 1fr 90px;align-items:center;gap:8px;font-size:12px}.miniBarTrack{height:12px;background:#f2e4eb;border-radius:8px;overflow:hidden}.miniBarTrack i{display:block;height:100%;background:#b83278;border-radius:8px}.miniBarRow b{text-align:right}.v32Analytics{margin-top:14px}@media(max-width:650px){.miniBarRow{grid-template-columns:60px 1fr 72px}.routeActions button{width:100%}}
+
+/* =====================================================================
+   V3.3 — Bandeau compact et modes Terrain / Bureau
+   ===================================================================== */
+.compactHeader{min-height:72px!important;height:auto!important;padding:7px 14px!important;gap:12px!important;display:flex!important;align-items:center!important;flex-wrap:nowrap!important;overflow:visible!important}
+.compactHeader .appLogo{width:190px!important;height:58px!important;max-width:30vw!important;flex:0 0 auto!important;object-fit:contain!important;object-position:left center!important}
+.compactHeader .headerTitle{min-width:170px!important;flex:0 1 auto!important}
+.compactHeader .headerTitle h1{font-size:22px!important;line-height:1.05!important}
+.compactHeader .headerTitle small{font-size:12px!important;white-space:nowrap!important}
+.modeSwitch{display:flex;align-items:center;gap:3px;background:#fdeaf3;border:1px solid #edbfd4;border-radius:999px;padding:3px;flex:0 0 auto}
+.modeSwitch button{padding:6px 11px!important;border:0!important;border-radius:999px!important;background:transparent!important;color:#8f245f!important;font-size:12px!important}
+.modeSwitch button.active{background:#b83278!important;color:#fff!important;box-shadow:0 1px 4px #7b1c4730}
+.compactHeader .headerStatus{margin-left:auto!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-end!important;gap:6px!important;flex-wrap:nowrap!important;min-width:0!important}
+.compactHeader .userBadge{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:5px 8px;font-size:11px}
+.compactHeader .syncBadge,.compactHeader .versionBadge,.compactHeader .logoutBtn{font-size:11px!important;padding:5px 8px!important;white-space:nowrap}
+nav{top:73px!important}
+body.mode-terrain nav{justify-content:center}
+body.mode-terrain #nav button{font-size:15px;padding:12px 18px}
+.modeInfo{display:inline-flex;align-items:center;gap:5px;font-weight:700;color:#9b2864}
+@media(max-width:850px){
+ .compactHeader{flex-wrap:wrap!important;padding:6px 9px!important;gap:6px!important}
+ .compactHeader .appLogo{width:155px!important;height:50px!important;max-width:48vw!important}
+ .compactHeader .headerTitle{display:none!important}
+ .modeSwitch{order:3;width:100%;justify-content:center;margin-top:1px}
+ .compactHeader .headerStatus{max-width:50vw!important;gap:3px!important}
+ .compactHeader .userBadge{display:none!important}
+ .compactHeader .logoutBtn{display:none!important}
+ nav{top:104px!important}
+}
+@media(max-width:480px){
+ .compactHeader .appLogo{width:145px!important;height:46px!important}
+ .compactHeader .syncBadge{max-width:90px;overflow:hidden;text-overflow:ellipsis}
+ body.mode-terrain #nav button{font-size:14px;padding:11px 13px}
+}
+.hiddenByMode{display:none!important}
