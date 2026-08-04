@@ -1193,7 +1193,7 @@ renderHome = function(){
 /* =====================================================================
    V3.0 — Connexion Supabase, rôles et base partagée
    ===================================================================== */
-const APP_VERSION_FINAL = '3.3';
+const APP_VERSION_FINAL = '3.3.1';
 const DEFAULT_SUPABASE_URL = 'https://kwbkqdkzdrjoxpzvfztg.supabase.co';
 let authSession = JSON.parse(localStorage.getItem('parage.authSession') || 'null');
 let currentProfile = null;
@@ -1490,7 +1490,7 @@ async function secureInit(){
   $('loginSupabaseUrl').value=localStorage.getItem('parage.supabaseUrl')||DEFAULT_SUPABASE_URL;
   $('loginSupabaseKey').value=localStorage.getItem('parage.supabaseKey')||'';
   await init();
-  document.querySelector('.versionBadge').textContent='v3.3';
+  document.querySelector('.versionBadge').textContent='v3.3.1';
   if(authSession?.access_token){
     try{await loadCurrentProfile();await enterApplication();return;}catch(e){if(!(await refreshAuthSession())){authSession=null;localStorage.removeItem('parage.authSession');}else{try{await loadCurrentProfile();await enterApplication();return;}catch{}}}
   }
@@ -1738,9 +1738,9 @@ saveCosts=function(){
 };
 
 /* =====================================================================
-   V3.3 — Mode Terrain / Bureau et navigation par rôle
+   V3.3.1 — Mode Terrain / Bureau et navigation par rôle
    ===================================================================== */
-const APP_VERSION_UI='3.3';
+const APP_VERSION_UI='3.3.1';
 let uiMode=localStorage.getItem('parage.uiMode')||'terrain';
 
 function roleCanChooseMode(){return ['admin','pareuse','technicien'].includes(role());}
@@ -1801,3 +1801,135 @@ function updateV33Labels(){
   document.title='Suivi Parage v'+APP_VERSION_UI;
 }
 updateV33Labels();
+
+/* =====================================================================
+   V3.3.1 — Gestion sécurisée des chantiers et corbeille
+   ===================================================================== */
+let showTrashHistory = false;
+
+function persistJobsV331(message=''){
+  saveAll();
+  if(typeof sharedCloudBackup==='function') sharedCloudBackup(false).catch(()=>{});
+  if(message) toast(message);
+  renderHome();
+  if(document.querySelector('#history.view.active')) renderHistory();
+}
+
+function historyStatusV331(job){
+  if(job.status==='trashed') return ['late','Corbeille'];
+  if(job.status==='cancelled') return ['late','Annulé'];
+  if(job.paymentStatus==='paid') return ['paid','Réglé'];
+  if(job.exportedAt||job.accountingSentAt) return ['sent','Transmis'];
+  if(job.status==='finished') return ['pending','À transmettre'];
+  return ['pending','Brouillon'];
+}
+
+function duplicateJobV331(id){
+  if(!canEditJobs()) return toast('Duplication réservée à la pareuse');
+  const source=jobs.find(j=>j.id===id);if(!source)return;
+  current=JSON.parse(JSON.stringify(source));
+  current.id=uid();current.date=today();current.start=nowTime();current.end='';current.status='draft';
+  current.exportedAt=null;current.accountingSentAt=null;current.invoiceNo='';current.paymentStatus='';current.paidAt=null;
+  current.createdAt=new Date().toISOString();
+  current.animals=(current.animals||[]).map(a=>Object.assign(syncLegacyAnimal(a),{id:uid(),done:false,collapsed:false}));
+  chantierStarted=true;fillJob();updateChantierUI();showView('chantier');
+  toast('Chantier dupliqué — vérifiez les informations');
+}
+
+function cancelValidatedJobV331(id){
+  if(!canEditJobs()&&!isAdmin())return toast('Action non autorisée');
+  const j=jobs.find(x=>x.id===id);if(!j)return;
+  if(!confirm(`Annuler le chantier du ${fmtDate(j.date)} pour ${j.clientName||j.cheptel} ?\n\nIl restera dans l’historique mais sera exclu des bilans et de la comptabilité.`))return;
+  j.status='cancelled';j.cancelledAt=new Date().toISOString();j.cancelledBy=currentProfile?.email||'';
+  persistJobsV331('Chantier annulé');
+}
+
+function restoreCancelledJobV331(id){
+  const j=jobs.find(x=>x.id===id);if(!j)return;
+  j.status='finished';delete j.cancelledAt;delete j.cancelledBy;
+  persistJobsV331('Chantier restauré');
+}
+
+function moveJobToTrashV331(id){
+  if(!isAdmin())return toast('Suppression réservée à l’administratrice');
+  const j=jobs.find(x=>x.id===id);if(!j)return;
+  if(!confirm(`Placer ce chantier dans la corbeille ?\n\nIl pourra être restauré pendant 30 jours.`))return;
+  j.previousStatus=j.status;j.status='trashed';j.trashedAt=new Date().toISOString();
+  persistJobsV331('Chantier placé dans la corbeille');
+}
+
+function restoreFromTrashV331(id){
+  if(!isAdmin())return toast('Restauration réservée à l’administratrice');
+  const j=jobs.find(x=>x.id===id);if(!j)return;
+  j.status=j.previousStatus&&j.previousStatus!=='trashed'?j.previousStatus:'cancelled';
+  delete j.previousStatus;delete j.trashedAt;
+  persistJobsV331('Chantier restauré depuis la corbeille');
+}
+
+function permanentlyDeleteJobV331(id){
+  if(!isAdmin())return toast('Suppression définitive réservée à l’administratrice');
+  const j=jobs.find(x=>x.id===id);if(!j)return;
+  if(!confirm('ATTENTION : suppression définitive et irréversible. Continuer ?'))return;
+  if(!confirm(`Confirmer une seconde fois la suppression du chantier ${j.cheptel||''} du ${fmtDate(j.date)} ?`))return;
+  jobs=jobs.filter(x=>x.id!==id);persistJobsV331('Chantier supprimé définitivement');
+}
+
+function purgeExpiredTrashV331(){
+  if(!isAdmin())return;
+  const limit=Date.now()-30*24*60*60*1000;
+  const before=jobs.length;
+  jobs=jobs.filter(j=>!(j.status==='trashed'&&j.trashedAt&&new Date(j.trashedAt).getTime()<limit));
+  if(jobs.length!==before)persistJobsV331();
+}
+
+function toggleTrashHistoryV331(){showTrashHistory=!showTrashHistory;renderHistory();}
+
+function historyActionsV331(j){
+  if(j.status==='trashed'){
+    return isAdmin()?`<details class="jobMenu"><summary>⋮</summary><div class="jobMenuPanel"><button onclick="restoreFromTrashV331('${j.id}')">Restaurer</button><button class="danger" onclick="permanentlyDeleteJobV331('${j.id}')">Supprimer définitivement</button></div></details>`:'';
+  }
+  const edit=canEditJobs()?`<button onclick="openJob('${j.id}')">${j.status==='finished'?'Modifier':'Ouvrir'}</button>`:`<button onclick="openJob('${j.id}')">Consulter</button>`;
+  const pf=j.status==='finished'||j.status==='cancelled'?`<button onclick="openStoredProformaForJob('${j.id}')">Pro forma</button>`:'';
+  const duplicate=canEditJobs()?`<button onclick="duplicateJobV331('${j.id}')">Dupliquer</button>`:'';
+  const cancel=j.status==='finished'&&canEditJobs()?`<button onclick="cancelValidatedJobV331('${j.id}')">Annuler le chantier</button>`:'';
+  const restore=j.status==='cancelled'&&canEditJobs()?`<button onclick="restoreCancelledJobV331('${j.id}')">Restaurer le chantier</button>`:'';
+  const trash=isAdmin()?`<button class="danger" onclick="moveJobToTrashV331('${j.id}')">Mettre à la corbeille</button>`:'';
+  return `<details class="jobMenu"><summary>⋮</summary><div class="jobMenuPanel">${edit}${pf}${duplicate}${cancel}${restore}${trash}</div></details>`;
+}
+
+renderHistory=function(){
+  const search=$('historySearch');const q=(search?.value||'').toLowerCase();
+  const arr=jobs.filter(j=>showTrashHistory?j.status==='trashed':j.status!=='trashed')
+    .filter(j=>[j.cheptel,j.clientName,j.cpVille,j.address,j.date,...(j.animals||[]).map(a=>a.number)].join(' ').toLowerCase().includes(q))
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const el=$('historyList');if(!el)return;
+  el.innerHTML=arr.map(j=>{const c=calc(j),st=historyStatusV331(j);return `<div class="row jobHistoryRow"><div class="grow"><b>${fmtDate(j.date)} — ${esc(j.clientName||j.cheptel)}</b><br><small>${esc(j.cheptel||'')} · ${c.n} bovin(s) · ${c.pairs} paire(s) · ${c.band} pansement(s)</small></div><span class="status ${st[0]}">${st[1]}</span>${historyActionsV331(j)}</div>`;}).join('')||`<p>${showTrashHistory?'La corbeille est vide.':'Aucun chantier.'}</p>`;
+  const btn=$('trashHistoryBtn');if(btn)btn.textContent=showTrashHistory?'← Revenir aux chantiers':`Corbeille${isAdmin()?' ('+jobs.filter(j=>j.status==='trashed').length+')':''}`;
+};
+
+const cancelCurrentJobBaseV331=cancelCurrentJob;
+cancelCurrentJob=function(){
+  if(current&&current.id){
+    const existing=jobs.find(j=>j.id===current.id);
+    if((current.cheptel||(current.animals||[]).some(hasAnimalContent))&&!confirm('Abandonner ce chantier en cours ?\n\nToutes les données de ce brouillon seront supprimées.'))return;
+    if(existing&&existing.status==='draft'){jobs=jobs.filter(j=>j.id!==current.id);saveAll();}
+  }
+  current=blankJob();chantierStarted=false;updateChantierUI();showView('home');toast('Chantier abandonné');
+};
+
+const openJobBaseV331=openJob;
+openJob=function(id){
+  const j=jobs.find(x=>x.id===id);if(!j)return;
+  if(j.status==='trashed')return toast('Restaurez d’abord le chantier depuis la corbeille');
+  chantierStarted=true;return openJobBaseV331(id);
+};
+
+function installHistoryControlsV331(){
+  const toolbar=document.querySelector('#history .toolbar');
+  if(toolbar&&!$('trashHistoryBtn')){
+    const b=document.createElement('button');b.id='trashHistoryBtn';b.type='button';b.onclick=toggleTrashHistoryV331;b.textContent='Corbeille';toolbar.appendChild(b);
+  }
+  const cancelBtn=document.querySelector('#chantierForm .toolbar button[onclick="cancelCurrentJob()"]');if(cancelBtn)cancelBtn.textContent='Annuler le chantier';
+}
+installHistoryControlsV331();
+setTimeout(()=>{installHistoryControlsV331();purgeExpiredTrashV331();},1200);

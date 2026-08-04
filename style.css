@@ -94,3 +94,6 @@ body.mode-terrain #nav button{font-size:15px;padding:12px 18px}
  body.mode-terrain #nav button{font-size:14px;padding:11px 13px}
 }
 .hiddenByMode{display:none!important}
+
+/* V3.3.1 — menus des chantiers et corbeille */
+.jobMenu{position:relative}.jobMenu>summary{list-style:none;cursor:pointer;border:1px solid #d8a2bd;background:#fff;padding:7px 12px;border-radius:9px;font-size:20px;font-weight:700;line-height:1}.jobMenu>summary::-webkit-details-marker{display:none}.jobMenuPanel{position:absolute;right:0;top:42px;z-index:30;min-width:220px;background:#fff;border:1px solid #e4b8ce;border-radius:12px;padding:8px;box-shadow:0 8px 28px #54203930;display:grid;gap:6px}.jobMenuPanel button{text-align:left;width:100%}.jobMenuPanel .danger{color:#a11f4f;border-color:#d99ab8;background:#fff4f8}.jobHistoryRow{overflow:visible}.status.late{background:#ffd8e6;color:#852044}@media(max-width:600px){.jobMenuPanel{position:fixed;left:12px;right:12px;top:auto;bottom:14px;min-width:0}.jobHistoryRow .status{margin-left:auto}}

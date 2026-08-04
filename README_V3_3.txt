@@ -2,7 +2,7 @@ SUIVI PARAGE — VERSION 3.3
 
 NOUVEAUTÉS
 - Bandeau supérieur compact sur ordinateur et mobile.
-- Numéro de version v3.3 corrigé dans l'application et le cache.
+- Numéro de version v3.3.1 corrigé dans l'application et le cache.
 - Bascule Mode Terrain / Mode Bureau.
 - Mode Terrain simplifié pour la pareuse : Accueil, Nouveau chantier, Historique et Fichiers.
 - Mode Bureau : accès aux modules supplémentaires autorisés par le rôle.
