@@ -49,3 +49,11 @@ header .appLogo{width:330px;height:96px;max-width:42vw;object-fit:contain;object
 .filtersPanel .grid3{align-items:end}
 @media(max-width:760px){.balanceGrid{grid-template-columns:1fr}.filtersPanel .grid3{grid-template-columns:1fr 1fr}}
 @media(max-width:480px){.filtersPanel .grid3{grid-template-columns:1fr}#technicalTab,#economicTab{width:100%}}
+
+/* V3.1.2 - démarrage explicite du chantier */
+.chantierStart{max-width:760px;margin:35px auto;text-align:center;padding:50px 28px;border:2px dashed #e58ab5;background:linear-gradient(180deg,#fff,#fff6fa)}
+.chantierStart .startIcon{width:88px;height:88px;border-radius:50%;display:grid;place-items:center;margin:0 auto 18px;background:#fdeaf3;color:#b83278;font-size:38px;font-weight:800}
+.chantierStart h2{font-size:30px;color:#4a2638;margin:8px 0}.chantierStart p{font-size:17px;line-height:1.5;color:#815267;max-width:580px;margin:0 auto 24px}
+.startJobButton{min-width:min(430px,100%);font-size:20px;padding:18px 24px;box-shadow:0 8px 20px #b8327830}.startHelp{margin:22px auto 0;padding:12px;border-radius:10px;background:#fff2d8;color:#76500b;max-width:560px}
+#chantierForm[hidden],#chantierStart[hidden]{display:none!important}
+@media(max-width:600px){.chantierStart{margin:14px auto;padding:34px 18px}.chantierStart h2{font-size:25px}.startJobButton{font-size:17px}}
