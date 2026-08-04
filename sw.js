@@ -1,4 +1,4 @@
-const C='parage-v2-1';
+const C='parage-v3-0';
 const FILES=['./','index.html','style.css','app.js','manifest.json','app-logo.png','icon-192.png','icon-512.png','apple-touch-icon.png','favicon.png','assets/logo-gds.png','clients.json'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(FILES)))});
 self.addEventListener('activate',e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==C).map(k=>caches.delete(k))))])));

@@ -1156,4 +1156,213 @@ renderHome = function(){
   if($('homeCards')) $('homeCards').innerHTML=card('Chantiers du mois',monthJobs.length)+card('Bovins',counts.n)+card('Pieds travaillés',counts.feet)+card('À envoyer',pending)+card('Bovins à contrôler',review.size)+card('Factures en attente',unpaid);
 };
 
-init();
+
+/* =====================================================================
+   V3.0 — Connexion Supabase, rôles et base partagée
+   ===================================================================== */
+const APP_VERSION_FINAL = '3.0';
+const DEFAULT_SUPABASE_URL = 'https://kwbkqdkzdrjoxpzvfztg.supabase.co';
+let authSession = JSON.parse(localStorage.getItem('parage.authSession') || 'null');
+let currentProfile = null;
+let cloudTimer = null;
+let cloudBusy = false;
+
+function cloudConfig(){
+  return {
+    url: String(settings.supabaseUrl || localStorage.getItem('parage.supabaseUrl') || DEFAULT_SUPABASE_URL).replace(/\/$/,''),
+    key: String(settings.supabaseKey || localStorage.getItem('parage.supabaseKey') || '')
+  };
+}
+function authHeaders(extra={}){
+  const c=cloudConfig();
+  return Object.assign({'apikey':c.key,'Content-Type':'application/json'},authSession?.access_token?{'Authorization':'Bearer '+authSession.access_token}:{},extra);
+}
+function role(){ return currentProfile?.role || 'technicien'; }
+function canEditJobs(){ return ['admin','pareuse'].includes(role()); }
+function canEditAccounting(){ return ['admin','comptable'].includes(role()); }
+function canEditCosts(){ return ['admin','pareuse','comptable'].includes(role()); }
+function isAdmin(){ return role()==='admin'; }
+
+function toggleCloudConfig(){ const b=$('cloudConfigBox'); b.hidden=!b.hidden; }
+function saveLoginCloudConfig(){
+  const url=($('loginSupabaseUrl').value||'').trim().replace(/\/rest\/v1\/?$/,'').replace(/\/$/,'');
+  const key=($('loginSupabaseKey').value||'').trim();
+  if(!url||!key){$('loginMessage').textContent='Renseignez l’URL et la clé publique.';return;}
+  localStorage.setItem('parage.supabaseUrl',url);localStorage.setItem('parage.supabaseKey',key);
+  settings.supabaseUrl=url;settings.supabaseKey=key;localStorage.setItem('parage.settings',JSON.stringify(settings));
+  $('cloudConfigBox').hidden=true;$('loginMessage').textContent='Connexion Supabase enregistrée.';
+}
+
+async function signIn(){
+  const email=($('loginEmail').value||'').trim(), password=$('loginPassword').value||'';
+  const c=cloudConfig();
+  if(!c.key){$('loginMessage').textContent='Configurez d’abord la clé publique Supabase.';$('cloudConfigBox').hidden=false;return;}
+  if(!email||!password){$('loginMessage').textContent='Saisissez l’email et le mot de passe.';return;}
+  $('loginMessage').textContent='Connexion…';
+  try{
+    const r=await fetch(`${c.url}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'apikey':c.key,'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.error_description||data.msg||'Connexion refusée');
+    authSession=data;localStorage.setItem('parage.authSession',JSON.stringify(data));
+    await loadCurrentProfile();
+    await enterApplication();
+  }catch(e){$('loginMessage').textContent=e.message||'Erreur de connexion';}
+}
+async function refreshAuthSession(){
+  if(!authSession?.refresh_token) return false;
+  const c=cloudConfig();if(!c.key)return false;
+  try{
+    const r=await fetch(`${c.url}/auth/v1/token?grant_type=refresh_token`,{method:'POST',headers:{'apikey':c.key,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:authSession.refresh_token})});
+    if(!r.ok)return false;authSession=await r.json();localStorage.setItem('parage.authSession',JSON.stringify(authSession));return true;
+  }catch{return false;}
+}
+async function loadCurrentProfile(){
+  const c=cloudConfig();
+  const r=await fetch(`${c.url}/rest/v1/profiles?id=eq.${encodeURIComponent(authSession.user.id)}&select=id,email,display_name,role,active`,{headers:authHeaders()});
+  if(r.status===401&&await refreshAuthSession()) return loadCurrentProfile();
+  if(!r.ok)throw new Error('Profil utilisateur introuvable. Vérifiez le script SQL Supabase.');
+  const rows=await r.json();if(!rows.length)throw new Error('Aucun profil associé à ce compte.');
+  currentProfile=rows[0];if(currentProfile.active===false)throw new Error('Ce compte a été désactivé.');
+}
+async function signOut(){
+  try{const c=cloudConfig();await fetch(`${c.url}/auth/v1/logout`,{method:'POST',headers:authHeaders()});}catch{}
+  authSession=null;currentProfile=null;localStorage.removeItem('parage.authSession');location.reload();
+}
+
+async function enterApplication(){
+  $('loginScreen').classList.add('hidden');$('logoutBtn').hidden=false;
+  $('userBadge').textContent=`${currentProfile.display_name||currentProfile.email} · ${roleLabel(role())}`;
+  applyRoleUI();
+  await sharedCloudRestore(true);
+  updateSyncBadge();renderHome();
+}
+function roleLabel(r){return ({admin:'Admin',pareuse:'Pareuse',comptable:'Comptable',technicien:'Technicien'})[r]||r;}
+function applyRoleUI(){
+  document.querySelectorAll('[data-roles]').forEach(el=>{
+    const allowed=el.dataset.roles.split(',');el.classList.toggle('hiddenByRole',!allowed.includes(role()));
+  });
+  const start=document.querySelector('#home .hero button');if(start)start.hidden=!canEditJobs();
+  document.querySelectorAll('#chantier input,#chantier select,#chantier textarea,#chantier button').forEach(el=>el.disabled=!canEditJobs());
+  if($('accountingDate'))$('accountingDate').disabled=false;
+  if($('costFuel')) ['costFuel','costToll','costMaterial','costMeals','costOther','costComment'].forEach(id=>$(id).disabled=!canEditCosts());
+  const saveCostsBtn=document.querySelector('#stats button[onclick="saveCosts()"]');if(saveCostsBtn)saveCostsBtn.hidden=!canEditCosts();
+}
+
+const originalShowViewV3=showView;
+showView=function(viewId){
+  const nav=document.querySelector(`#nav button[data-view="${viewId}"]`);
+  if(nav&&nav.classList.contains('hiddenByRole')){toast('Accès non autorisé pour ce profil');return;}
+  originalShowViewV3(viewId);
+  if(viewId==='users')refreshUsers();
+};
+
+const originalSaveAllV3=saveAll;
+saveAll=function(){
+  originalSaveAllV3();
+  localStorage.setItem('parage.pendingSync','1');updateSyncBadge();
+  clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>sharedCloudBackup(false),1200);
+};
+
+function updateSyncBadge(text){
+  const b=$('syncBadge');if(!b)return;
+  if(text){b.textContent=text;return;}
+  if(!navigator.onLine){b.textContent='Hors ligne · données locales';b.className='syncBadge pending';return;}
+  const pending=localStorage.getItem('parage.pendingSync')==='1';
+  b.textContent=pending?'En attente de synchronisation':'Cloud à jour';b.className='syncBadge '+(pending?'pending':'sent');
+}
+
+function sharedPayload(){
+  return {jobs,settings:Object.assign({},settings,{supabaseKey:''}),costs,addressOverrides,importedClients,version:APP_VERSION_FINAL,updatedBy:currentProfile?.email||''};
+}
+async function sharedCloudBackup(showToast=true){
+  if(cloudBusy||!authSession||!navigator.onLine||role()==='technicien')return false;
+  const c=cloudConfig();if(!c.key)return false;cloudBusy=true;updateSyncBadge('Synchronisation…');
+  try{
+    const r=await fetch(`${c.url}/rest/v1/parage_backups?on_conflict=id`,{method:'POST',headers:authHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({id:'suivi-parage-main',payload:sharedPayload(),updated_at:new Date().toISOString()})});
+    if(r.status===401&&await refreshAuthSession()){cloudBusy=false;return sharedCloudBackup(showToast);}
+    if(!r.ok)throw new Error(await r.text());
+    localStorage.removeItem('parage.pendingSync');updateSyncBadge();if(showToast)toast('Sauvegarde en ligne à jour');return true;
+  }catch(e){updateSyncBadge('Erreur de synchronisation');if(showToast)toast('Sauvegarde locale conservée — cloud indisponible');return false;
+  }finally{cloudBusy=false;}
+}
+async function sharedCloudRestore(silent=false){
+  if(!authSession||!navigator.onLine)return false;
+  const c=cloudConfig();
+  try{
+    const r=await fetch(`${c.url}/rest/v1/parage_backups?id=eq.suivi-parage-main&select=payload,updated_at`,{headers:authHeaders()});
+    if(r.status===401&&await refreshAuthSession())return sharedCloudRestore(silent);
+    if(!r.ok)throw new Error(await r.text());const rows=await r.json();
+    if(!rows.length){if(canEditJobs()||canEditAccounting())await sharedCloudBackup(false);return true;}
+    const p=rows[0].payload||{};
+    jobs=p.jobs||jobs;costs=p.costs||costs;addressOverrides=p.addressOverrides||addressOverrides;importedClients=p.importedClients||importedClients;
+    const localCloud={supabaseUrl:settings.supabaseUrl,supabaseKey:settings.supabaseKey,accountingEmail:settings.accountingEmail};
+    settings=Object.assign(settings,p.settings||{},localCloud);
+    originalSaveAllV3();localStorage.setItem('parage.costs',JSON.stringify(costs));localStorage.setItem('parage.addressOverrides',JSON.stringify(addressOverrides));localStorage.setItem('parage.importedClients',JSON.stringify(importedClients));localStorage.setItem('parage.settings',JSON.stringify(settings));
+    loadSettings();renderHome();renderHistory();if(!silent)toast('Données partagées actualisées');return true;
+  }catch(e){if(!silent)toast('Lecture cloud impossible — données locales utilisées');return false;}
+}
+cloudBackup=sharedCloudBackup;cloudRestore=()=>sharedCloudRestore(false);
+window.addEventListener('online',()=>{updateSyncBadge();sharedCloudRestore(true).then(()=>sharedCloudBackup(false));});
+window.addEventListener('offline',()=>updateSyncBadge());
+setInterval(()=>{if(localStorage.getItem('parage.pendingSync')==='1')sharedCloudBackup(false);},60000);
+
+/* Comptabilité : lecture pour tous, modification réservée à admin/comptable */
+renderAccounting=function(){
+  const arr=accountingJobsForDate();
+  const totals=arr.reduce((s,j)=>{const c=calc(j);s.n+=c.n;s.ht+=c.ht;s.ttc+=c.ttc;return s;},{n:0,ht:0,ttc:0});
+  if($('accountingCards'))$('accountingCards').innerHTML=card('Chantiers',arr.length)+card('Bovins',totals.n)+card('Total HT',euro(totals.ht))+card('Total TTC',euro(totals.ttc));
+  if(!$('accountingList'))return;
+  const readonly=!canEditAccounting();
+  $('accountingList').innerHTML=(readonly?'<div class="readOnlyNote">Consultation en lecture seule. La comptable ou l’administratrice met à jour les factures et règlements.</div>':'')+arr.map(j=>{
+    const c=calc(j),st=accountingStatus(j);
+    return `<div class="row accountingRow ${readonly?'readonly':''}">
+      <input type="checkbox" class="accountingCheck" value="${j.id}" ${st[0]==='pending'?'checked':''} ${readonly?'disabled':''}>
+      <div class="grow"><b>${esc(j.start||'--:--')} — ${esc(j.clientName||j.cheptel)}</b><br><small>${esc(j.cheptel)} · ${c.n} bovin(s) · ${euro(c.ht)} HT · ${euro(c.ttc)} TTC</small></div>
+      <span class="status ${st[0]}">${st[1]}</span>
+      <label class="compactField">N° facture<input value="${esc(j.invoiceNo||'')}" onchange="updateAccountingJob('${j.id}','invoiceNo',this.value)" ${readonly?'readonly':''}></label>
+      <select onchange="setAccountingStatus('${j.id}',this.value)" ${readonly?'disabled':''}>
+        <option value="pending" ${st[0]==='pending'?'selected':''}>À envoyer</option><option value="sent" ${st[0]==='sent'?'selected':''}>Envoyé</option><option value="invoiced" ${st[0]==='invoiced'?'selected':''}>Facturé</option><option value="paid" ${st[0]==='paid'?'selected':''}>Réglé</option><option value="late" ${st[0]==='late'?'selected':''}>Impayé / retard</option>
+      </select><button onclick="openStoredProformaForJob('${j.id}')">Pro forma</button></div>`;
+  }).join('')||'<div class="panel"><p>Aucun chantier validé à cette date.</p></div>';
+  const sendBtn=document.querySelector('#accounting button[onclick="sendAccountingDay()"]');if(sendBtn)sendBtn.hidden=!['admin','pareuse','comptable'].includes(role());
+};
+const originalUpdateAccountingJobV3=updateAccountingJob;
+updateAccountingJob=function(id,key,value){if(!canEditAccounting())return toast('Modification réservée à la comptabilité');originalUpdateAccountingJobV3(id,key,value);};
+const originalSetAccountingStatusV3=setAccountingStatus;
+setAccountingStatus=function(id,status){if(!canEditAccounting())return toast('Modification réservée à la comptabilité');originalSetAccountingStatusV3(id,status);};
+
+/* Gestion des utilisateurs : rôles réservés à l’admin */
+async function refreshUsers(){
+  if(!isAdmin()||!$('usersList'))return;
+  const c=cloudConfig();$('usersList').innerHTML='<p>Chargement…</p>';
+  try{
+    const r=await fetch(`${c.url}/rest/v1/profiles?select=id,email,display_name,role,active,created_at&order=email.asc`,{headers:authHeaders()});
+    if(!r.ok)throw new Error(await r.text());const rows=await r.json();
+    $('usersList').innerHTML=rows.map(u=>`<div class="row"><div class="grow"><b>${esc(u.display_name||u.email)}</b><br><small>${esc(u.email)}</small></div><span class="rolePill">${roleLabel(u.role)}</span><select class="roleSelect" onchange="updateUserRole('${u.id}',this.value)">${['admin','pareuse','comptable','technicien'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${roleLabel(r)}</option>`).join('')}</select><label><input type="checkbox" ${u.active!==false?'checked':''} onchange="updateUserActive('${u.id}',this.checked)"> Actif</label></div>`).join('')||'<p>Aucun utilisateur.</p>';
+  }catch(e){$('usersList').innerHTML='<p>Impossible de charger les utilisateurs.</p>';}
+}
+async function patchProfile(id,body){
+  if(!isAdmin())return toast('Accès administrateur requis');const c=cloudConfig();
+  const r=await fetch(`${c.url}/rest/v1/profiles?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',headers:authHeaders({'Prefer':'return=minimal'}),body:JSON.stringify(body)});
+  if(!r.ok)return toast('Modification refusée');toast('Utilisateur mis à jour');refreshUsers();
+}
+function updateUserRole(id,newRole){if(id===currentProfile.id&&newRole!=='admin'&&!confirm('Retirer votre propre accès administrateur ?')){refreshUsers();return;}patchProfile(id,{role:newRole});}
+function updateUserActive(id,active){if(id===currentProfile.id&&!active){toast('Vous ne pouvez pas désactiver votre propre compte');refreshUsers();return;}patchProfile(id,{active});}
+
+/* Verrouillage des fonctions sensibles côté interface */
+const originalNewJobV3=newJob;newJob=function(){if(!canEditJobs())return toast('Création réservée à la pareuse');return originalNewJobV3();};
+const originalFinishJobV3=finishJob;finishJob=function(){if(!canEditJobs())return toast('Validation réservée à la pareuse');return originalFinishJobV3();};
+const originalSaveSettingsV3=saveSettings;saveSettings=function(){if(!isAdmin())return toast('Paramètres réservés à l’administratrice');return originalSaveSettingsV3();};
+const originalSaveAddressOverrideV3=saveAddressOverride;saveAddressOverride=function(){if(!['admin','pareuse'].includes(role()))return toast('Modification non autorisée');return originalSaveAddressOverrideV3();};
+
+async function secureInit(){
+  $('loginSupabaseUrl').value=localStorage.getItem('parage.supabaseUrl')||DEFAULT_SUPABASE_URL;
+  $('loginSupabaseKey').value=localStorage.getItem('parage.supabaseKey')||'';
+  await init();
+  document.querySelector('.versionBadge').textContent='v3.0';
+  if(authSession?.access_token){
+    try{await loadCurrentProfile();await enterApplication();return;}catch(e){if(!(await refreshAuthSession())){authSession=null;localStorage.removeItem('parage.authSession');}else{try{await loadCurrentProfile();await enterApplication();return;}catch{}}}
+  }
+  $('loginScreen').classList.remove('hidden');
+}
+secureInit();

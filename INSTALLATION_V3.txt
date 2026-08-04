@@ -1,0 +1,20 @@
+SUIVI PARAGE V3.0 — MISE EN SERVICE
+
+1. Dans Supabase > SQL Editor, exécuter SUPABASE_SETUP_V3.sql.
+2. Dans Supabase > Authentication > Users, créer les comptes avec email et mot de passe.
+3. Le premier compte créé est automatiquement ADMIN.
+4. Se connecter à l'application avec le compte admin.
+5. Ouvrir Utilisateurs et attribuer les rôles : Pareuse, Comptable, Technicien.
+6. Remplacer tous les fichiers du dépôt GitHub par le contenu de ce dossier.
+7. Sur iPhone, supprimer l'ancien raccourci puis ajouter à nouveau à l'écran d'accueil.
+
+DROITS
+- Admin : accès complet, Adresses, Utilisateurs, Paramètres.
+- Pareuse : chantiers, historique, comptabilité en lecture, bilans, fichiers.
+- Comptable : comptabilité et règlements, pro formas, bilans économiques.
+- Technicien : historique, comptabilité et bilans techniques/économiques en lecture.
+
+HORS CONNEXION
+- Les données restent enregistrées localement.
+- La synchronisation reprend automatiquement au retour du réseau.
+- L'export JSON manuel reste disponible comme sauvegarde de secours.
