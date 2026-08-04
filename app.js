@@ -157,7 +157,15 @@ function syncLegacyAnimal(a) {
 
 function newJob() {
   current = blankJob();
+  current.date = today();
+  current.start = nowTime();
+  current.end = '';
   fillJob();
+  const d=$('jobDate'), st=$('startTime'), en=$('endTime');
+  if(d) d.value=current.date;
+  if(st) st.value=current.start;
+  if(en) en.value='';
+  setTimeout(()=>$('cheptel')?.focus(),30);
 }
 
 function fillJob() {
@@ -165,7 +173,7 @@ function fillJob() {
     ['cheptel', 'cheptel'], ['clientName', 'clientName'], ['address', 'address'], ['cpVille', 'cpVille'],
     ['department', 'department'], ['race', 'race'], ['jobDate', 'date'], ['startTime', 'start'],
     ['endTime', 'end'], ['paymentTiming','paymentTiming'], ['paymentMethod','paymentMethod'], ['fee', 'fee'], ['jobComment', 'comment']
-  ].forEach(([id, key]) => $(id).value = current[key] ?? '');
+  ].forEach(([id, key]) => { const el=$(id); if(el) el.value = current[key] ?? ''; });
   current.animals = (current.animals || []).map(syncLegacyAnimal);
   renderAnimals();
   renderTotals();
@@ -178,7 +186,7 @@ function syncJob() {
     ['cheptel', 'cheptel'], ['clientName', 'clientName'], ['address', 'address'], ['cpVille', 'cpVille'],
     ['department', 'department'], ['race', 'race'], ['jobDate', 'date'], ['startTime', 'start'],
     ['endTime', 'end'], ['paymentTiming','paymentTiming'], ['paymentMethod','paymentMethod'], ['fee', 'fee'], ['jobComment', 'comment']
-  ].forEach(([id, key]) => current[key] = $(id).value);
+  ].forEach(([id, key]) => { const el=$(id); if(el) current[key] = el.value; });
   current.fee = +current.fee || 0;
 }
 
@@ -1119,9 +1127,15 @@ function updateAccountingJob(id,key,value){const j=jobs.find(x=>x.id===id);if(!j
 function setAccountingStatus(id,status){const j=jobs.find(x=>x.id===id);if(!j)return;j.paymentStatus=status;if(status==='sent')j.accountingSentAt=j.accountingSentAt||new Date().toISOString();if(status==='paid')j.paidAt=new Date().toISOString();saveAll();cloudBackup(false);renderAccounting();renderPaymentAlert();}
 
 async function openStoredProformaForJob(jobId){
-  const recs=await idbGetAll();const rec=recs.filter(r=>r.kind==='proforma'&&r.jobId===jobId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
-  if(rec){openPdfPreview(rec.blob,rec.name);return;}
-  const j=jobs.find(x=>x.id===jobId);if(!j)return toast('Chantier introuvable');openPdfPreview(proformaPdfBlob(j),`Proforma_${j.cheptel}_${j.date}.pdf`);
+  try{
+    const j=jobs.find(x=>x.id===jobId);
+    if(!j)return toast('Chantier introuvable');
+    const blob=proformaPdfBlob(j);
+    openPdfPreview(blob,`Proforma_${j.cheptel}_${j.date}.pdf`,{validated:false});
+  }catch(e){
+    console.error(e);
+    toast('Impossible d’ouvrir la pro forma');
+  }
 }
 
 async function sendAccountingDay(){
@@ -1162,7 +1176,7 @@ renderHome = function(){
 /* =====================================================================
    V3.0 — Connexion Supabase, rôles et base partagée
    ===================================================================== */
-const APP_VERSION_FINAL = '3.0';
+const APP_VERSION_FINAL = '3.1.1';
 const DEFAULT_SUPABASE_URL = 'https://kwbkqdkzdrjoxpzvfztg.supabase.co';
 let authSession = JSON.parse(localStorage.getItem('parage.authSession') || 'null');
 let currentProfile = null;
@@ -1359,7 +1373,7 @@ const originalSaveAddressOverrideV3=saveAddressOverride;saveAddressOverride=func
 
 
 
-/* ===== V3.1 : bilans technique et économique filtrables ===== */
+/* ===== V3.1.1 : bilans technique et économique filtrables ===== */
 let activeBalanceTab='technical';
 
 function showBalanceTab(tab){
@@ -1466,3 +1480,115 @@ async function secureInit(){
   $('loginScreen').classList.remove('hidden');
 }
 secureInit();
+
+/* =====================================================================
+   V3.1.1 — Stabilisation terrain et pro forma lisible
+   ===================================================================== */
+function pdfTextSafe311(value){
+  return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[–—]/g,'-').replace(/[^\x20-\x7E]/g,' ');
+}
+function pdfEsc311(value){return pdfTextSafe311(value).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');}
+function pdfMoney311(value){return Number(value||0).toFixed(2).replace('.',',')+' EUR';}
+function pdfWrap311(text,max){
+  const words=pdfTextSafe311(text).split(/\s+/).filter(Boolean), out=[];let line='';
+  for(const w of words){const n=(line+' '+w).trim();if(n.length>max&&line){out.push(line);line=w;}else line=n;}
+  if(line)out.push(line);return out;
+}
+function buildPdf311(objects){
+  let pdf='%PDF-1.4\n', offsets=[0];
+  for(let i=1;i<objects.length;i++){offsets[i]=pdf.length;pdf+=`${i} 0 obj\n${objects[i]}\nendobj\n`;}
+  const xref=pdf.length;pdf+=`xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for(let i=1;i<objects.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';
+  pdf+=`trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return new TextEncoder().encode(pdf);
+}
+function makeProformaPdfV311(job){
+  const c=calc(job), fl=Object.fromEntries(feet), cmds=[];
+  const text=(x,y,size,value,bold=false)=>cmds.push(`BT /${bold?'F2':'F1'} ${size} Tf ${x} ${y} Td (${pdfEsc311(value)}) Tj ET`);
+  const line=(x1,y1,x2,y2,w=.6)=>cmds.push(`${w} w ${x1} ${y1} m ${x2} ${y2} l S`);
+  const rect=(x,y,w,h)=>cmds.push(`${x} ${y} ${w} ${h} re S`);
+  const fillRect=(x,y,w,h,g=.95)=>cmds.push(`${g} g ${x} ${y} ${w} ${h} re f 0 g`);
+  const pageW=595, margin=34;
+  text(margin,806,16,'GDS GERS HAUTES-PYRENEES',true);
+  text(330,806,13,'PRO FORMA / COMPTE RENDU DE PARAGE',true);
+  line(margin,792,pageW-margin,792,1.2);
+  rect(margin,716,250,64); rect(310,716,251,64);
+  text(44,764,9,'GDS Gers Hautes-Pyrenees',true);
+  text(44,750,8,'3 chemin de la Caillaouere');
+  text(44,738,8,'32000 AUCH');
+  text(320,764,9,`Eleveur : ${job.clientName||''}`,true);
+  text(320,750,8,`Cheptel : ${job.cheptel||''}`);
+  text(320,738,8,`${job.address||''}`);
+  text(320,726,8,`${job.cpVille||''}`);
+  text(margin,700,9,`Date : ${fmtDate(job.date)}    Heure : ${job.start||''} - ${job.end||''}`,true);
+  text(margin,681,11,'Prestations',true);
+  const tx=[34,300,365,445,561], top=668, rowH=22;
+  fillRect(tx[0],top-rowH,tx[4]-tx[0],rowH,.92);rect(tx[0],top-rowH,tx[4]-tx[0],rowH);
+  tx.slice(1,-1).forEach(x=>line(x,top-rowH,x,top));
+  ['Prestation','Qte','Tarif HT','Total HT'].forEach((h,i)=>text(tx[i]+5,top-15,8,h,true));
+  const rows=[
+    ['Deplacement / mise en place',1,+job.fee||0,+job.fee||0],
+    ['Paires de pieds',c.pairs,c.pairRate,c.pairs*c.pairRate],
+    ['Pieds seuls',c.single,c.footRate,c.single*c.footRate],
+    ['Pansements',c.band,c.bandageRate,c.band*c.bandageRate],
+    ['Talonnettes',c.blocks,c.blockRate,c.blocks*c.blockRate]
+  ];
+  rows.forEach((r,i)=>{const y=top-rowH*(i+2);rect(tx[0],y,tx[4]-tx[0],rowH);tx.slice(1,-1).forEach(x=>line(x,y,x,y+rowH));text(tx[0]+5,y+7,8,r[0]);text(tx[1]+10,y+7,8,r[1]);text(tx[2]+5,y+7,8,pdfMoney311(r[2]));text(tx[3]+5,y+7,8,pdfMoney311(r[3]));});
+  let y=top-rowH*(rows.length+2);
+  [['TOTAL HT',c.ht],['TVA '+settings.vat+' %',c.ttc-c.ht],['TOTAL TTC',c.ttc]].forEach((r,i)=>{rect(365,y-rowH*i,196,rowH);line(445,y-rowH*i,445,y-rowH*i+rowH);text(371,y-rowH*i+7,8,r[0],true);text(451,y-rowH*i+7,8,pdfMoney311(r[1]),true);});
+  y-=rowH*3+16;text(margin,y,11,'Recapitulatif de l intervention',true);y-=16;
+  const ax=[34,88,150,315,450,561], headerY=y;
+  fillRect(ax[0],headerY-20,ax[5]-ax[0],20,.92);rect(ax[0],headerY-20,ax[5]-ax[0],20);ax.slice(1,-1).forEach(x=>line(x,headerY-20,x,headerY));
+  ['N bovin','Categorie','Pieds realises','Problemes','Soins'].forEach((h,i)=>text(ax[i]+4,headerY-13,7.5,h,true));
+  y=headerY-20;
+  for(const a of (job.animals||[])){
+    ensureWorkedFeet(a);const probs=[],soins=new Set();
+    for(const [k,d] of Object.entries(a.claws||{})){if((d.issues||[]).length)probs.push(`${k}: ${(d.issues||[]).join(', ')}`);for(const x of (d.care||[]))if(x==='Pansement'||x==='Talonnette')soins.add(x);}
+    const vals=[a.number||'-',categoryLabels[a.category]||a.category||'-',(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')||'-',probs.join('; ')||'RAS',[...soins].join(', ')||'-'];
+    const wrapped=vals.map((v,i)=>pdfWrap311(v,[8,11,28,24,16][i]));const lines=Math.max(...wrapped.map(v=>v.length),1);const h=Math.max(20,lines*9+5);
+    if(y-h<95) break;
+    rect(ax[0],y-h,ax[5]-ax[0],h);ax.slice(1,-1).forEach(x=>line(x,y-h,x,y));
+    wrapped.forEach((ls,i)=>ls.forEach((t,j)=>text(ax[i]+3,y-11-j*9,7,t)));
+    if(a.checkNext) text(ax[4]+3,y-h+3,6.5,'A CONTROLER',true);
+    y-=h;
+  }
+  y-=12;text(margin,y,8,`Modalite : ${job.paymentTiming||'A reception'}     Mode : ${job.paymentMethod||'Cheque'}`,true);
+  y-=13;text(margin,y,7.5,'Paiement a 20 jours - IBAN FR76 1690 6010 2003 4001 9914 139 - BIC AGRIFRPP869');
+  y-=13;text(margin,y,7.5,'Document pro forma etabli sur place. La facture definitive sera emise par la comptabilite.');
+  const stream=cmds.join('\n'), objects=[];
+  objects[1]='<< /Type /Catalog /Pages 2 0 R >>';
+  objects[2]='<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
+  objects[3]='<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>';
+  objects[4]=`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+  objects[5]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+  objects[6]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+  return buildPdf311(objects);
+}
+proformaPdfBlob=function(job){return new Blob([makeProformaPdfV311(job)],{type:'application/pdf'});};
+
+openPdfPreview=function(blob,name,options={}){
+  document.querySelector('.pdfOverlay')?.remove();
+  const url=URL.createObjectURL(blob), validated=!!options.validated;
+  const overlay=document.createElement('div');overlay.className='pdfOverlay';
+  overlay.innerHTML=`<div class="pdfToolbar"><strong>${esc(name)}</strong><button class="primary" id="pdfShare">Partager / imprimer</button><button id="pdfClose">Retour a l application</button></div><iframe title="Apercu pro forma" src="${url}"></iframe>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#pdfClose').onclick=()=>{
+    URL.revokeObjectURL(url);overlay.remove();
+    if(validated){newJob();showView('home');toast('Chantier enregistre avec succes');}
+  };
+  overlay.querySelector('#pdfShare').onclick=()=>shareBlob(blob,name);
+};
+
+finishJob=async function(){
+  if(!canEditJobs())return toast('Validation reservee a la pareuse');
+  syncJob();current.animals=current.animals.filter(a=>hasAnimalContent(a));
+  if(!current.animals.length)return toast('Aucun bovin enregistre');
+  current.animals.forEach(a=>{a.done=true;a.collapsed=true;});
+  current.end=nowTime();if($('endTime'))$('endTime').value=current.end;current.status='finished';
+  saveAddressOverride(true);saveJob();archiveFinishedJob(current);
+  const snapshot=JSON.parse(JSON.stringify(current)),name=`Proforma_${snapshot.cheptel}_${snapshot.date}.pdf`,pdf=proformaPdfBlob(snapshot);
+  await storeGeneratedFile(name,pdf,'proforma',snapshot.id).catch(()=>{});sharedCloudBackup(false);
+  openPdfPreview(pdf,name,{validated:true});
+};
+
+printProforma=function(){syncJob();openPdfPreview(proformaPdfBlob(current),`Proforma_${current.cheptel||'chantier'}_${current.date}.pdf`,{validated:false});};
