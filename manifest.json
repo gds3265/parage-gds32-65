@@ -1,9 +1,9 @@
 {
-  "name": "Suivi Parage V3.0",
+  "name": "Suivi Parage V3.1",
   "short_name": "Parage",
   "description": "Suivi des chantiers de parage bovin",
-  "id": "./?app=suivi-parage-v21",
-  "start_url": "./index.html?v=3.0",
+  "id": "./?app=suivi-parage-v31",
+  "start_url": "./index.html?v=3.1",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",

@@ -47,11 +47,13 @@ let settings = Object.assign({
   businessDetails: "GDS 32 - Gers Hautes-Pyrénées\n3 chemin de la caillaouère\n32000 AUCH",
   accountingEmail: '',
   supabaseUrl: '',
-  supabaseKey: ''
+  supabaseKey: '',
+  defaultRouteStart: 'Pontis-de-Rivière (31)',
+  defaultKmRate: 0.65
 }, JSON.parse(localStorage.getItem('parage.settings') || '{}'));
 let costs = JSON.parse(localStorage.getItem('parage.costs') || '{}');
 let addressOverrides = JSON.parse(localStorage.getItem('parage.addressOverrides') || '{}');
-const APP_VERSION='2.1';
+const APP_VERSION='3.1';
 
 function saveAll() {
   localStorage.setItem('parage.jobs', JSON.stringify(jobs));
@@ -87,7 +89,7 @@ async function init() {
   $('races').innerHTML = races.map(x => `<option value="${x}">`).join('');
   bindClient();
   loadSettings();
-  $('statsMonth').value = today().slice(0, 7);
+  if($('statsMonth')) $('statsMonth').value = today().slice(0, 7);
   if ($('accountingDate')) $('accountingDate').value = today();
   renderHome();
   newJob();
@@ -877,7 +879,7 @@ init = async function() {
   $('races').innerHTML = races.map(x => `<option value="${x}">`).join('');
   bindClient();
   loadSettings();
-  $('statsMonth').value = today().slice(0, 7);
+  if($('statsMonth')) $('statsMonth').value = today().slice(0, 7);
   if ($('accountingDate')) $('accountingDate').value = today();
   renderHome();
   newJob();
@@ -1355,11 +1357,109 @@ const originalFinishJobV3=finishJob;finishJob=function(){if(!canEditJobs())retur
 const originalSaveSettingsV3=saveSettings;saveSettings=function(){if(!isAdmin())return toast('Paramètres réservés à l’administratrice');return originalSaveSettingsV3();};
 const originalSaveAddressOverrideV3=saveAddressOverride;saveAddressOverride=function(){if(!['admin','pareuse'].includes(role()))return toast('Modification non autorisée');return originalSaveAddressOverrideV3();};
 
+
+
+/* ===== V3.1 : bilans technique et économique filtrables ===== */
+let activeBalanceTab='technical';
+
+function showBalanceTab(tab){
+  activeBalanceTab=tab;
+  if($('technicalBalance'))$('technicalBalance').hidden=tab!=='technical';
+  if($('economicBalance'))$('economicBalance').hidden=tab!=='economic';
+  if($('technicalTab'))$('technicalTab').classList.toggle('primary',tab==='technical');
+  if($('economicTab'))$('economicTab').classList.toggle('primary',tab==='economic');
+  renderStats();
+}
+
+function initBalanceFilters(){
+  if(!$('filterStart'))return;
+  if(!$('filterStart').value){const d=new Date(),first=new Date(d.getFullYear(),d.getMonth(),1);$('filterStart').value=first.toISOString().slice(0,10);$('filterEnd').value=today();}
+  const depValue=$('filterDepartment').value, raceValue=$('filterRace').value, issueValue=$('filterIssue').value, careValue=$('filterCare').value;
+  const deps=[...new Set(jobs.map(j=>j.department).filter(Boolean))].sort();
+  const jobRaces=[...new Set([...races,...jobs.map(j=>j.race).filter(Boolean)])].sort();
+  $('filterDepartment').innerHTML='<option value="">Tous</option>'+deps.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  $('filterRace').innerHTML='<option value="">Toutes</option>'+jobRaces.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  $('filterIssue').innerHTML='<option value="">Tous</option>'+issues.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  $('filterCare').innerHTML='<option value="">Tous</option>'+care.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  $('filterDepartment').value=depValue;$('filterRace').value=raceValue;$('filterIssue').value=issueValue;$('filterCare').value=careValue;
+}
+
+function balanceFilters(){
+  return {start:$('filterStart')?.value||'',end:$('filterEnd')?.value||'',department:$('filterDepartment')?.value||'',race:$('filterRace')?.value||'',category:$('filterCategory')?.value||'',issue:$('filterIssue')?.value||'',care:$('filterCare')?.value||'',farm:($('filterFarm')?.value||'').trim().toLowerCase(),town:($('filterTown')?.value||'').trim().toLowerCase()};
+}
+function animalMatchesV31(a,f){
+  if(f.category&&a.category!==f.category)return false;
+  const clawValues=Object.values(a.claws||{});
+  if(f.issue&&!clawValues.some(d=>(d.issues||[]).includes(f.issue)))return false;
+  if(f.care&&!clawValues.some(d=>(d.care||[]).includes(f.care)))return false;
+  return true;
+}
+function filteredBalanceData(){
+  const f=balanceFilters();
+  const rows=jobs.filter(j=>j.status==='finished'&&(!f.start||j.date>=f.start)&&(!f.end||j.date<=f.end)&&(!f.department||j.department===f.department)&&(!f.race||String(j.race||'').toLowerCase()===f.race.toLowerCase())&&(!f.farm||`${j.clientName||''} ${j.cheptel||''}`.toLowerCase().includes(f.farm))&&(!f.town||`${j.cpVille||''} ${j.address||''}`.toLowerCase().includes(f.town)));
+  const selected=[];
+  for(const j of rows){const animals=(j.animals||[]).filter(a=>animalMatchesV31(a,f));if((f.category||f.issue||f.care)&&!animals.length)continue;selected.push({job:j,animals:(f.category||f.issue||f.care)?animals:(j.animals||[])});}
+  return {filters:f,selected};
+}
+function countAnimalTechnical(a,out){
+  ensureWorkedFeet(a);out.animals++;out.feet+=(a.workedFeet||[]).length;if(a.checkNext)out.review++;
+  const animalIssues=new Set();
+  for(const [key,d] of Object.entries(a.claws||{})){
+    for(const x of d.issues||[]){out.issues[x]=(out.issues[x]||0)+1;animalIssues.add(x);}
+    for(const x of d.care||[]){if(x==='Pansement')out.band++;if(x==='Talonnette')out.blocks++;}
+    const parts=key.split('-');if((d.issues||[]).length){out.affectedFeet[parts[0]]=(out.affectedFeet[parts[0]]||0)+1;out.clawSides[parts[1]]=(out.clawSides[parts[1]]||0)+1;}
+  }
+  out.races[a.race||'']=(out.races[a.race||'']||0);
+  return animalIssues;
+}
+function balanceCostKey(){const f=balanceFilters();return `range:${f.start||'all'}:${f.end||'all'}`;}
+function currentBalanceCosts(){return costs[balanceCostKey()]||{};}
+
+function renderStats(){
+  initBalanceFilters();
+  const {selected}=filteredBalanceData();
+  const tech={animals:0,feet:0,band:0,blocks:0,review:0,issues:{},departments:{},races:{},categories:{},affectedFeet:{},clawSides:{},farms:new Set()};
+  let ht=0,ttc=0,invoiced=0,paid=0,pending=0;
+  for(const {job,animals} of selected){
+    tech.farms.add(job.cheptel||job.clientName);tech.departments[job.department||'Non renseigné']=(tech.departments[job.department||'Non renseigné']||0)+1;
+    tech.races[job.race||'Non renseignée']=(tech.races[job.race||'Non renseignée']||0)+animals.length;
+    for(const a of animals){tech.categories[categoryLabels[a.category]||a.category||'Non renseignée']=(tech.categories[categoryLabels[a.category]||a.category||'Non renseignée']||0)+1;countAnimalTechnical(a,tech);}
+    const c=calc(job);ht+=c.ht;ttc+=c.ttc;
+    if(job.paymentStatus==='paid'||job.paidAt)paid+=c.ttc;else pending+=c.ttc;
+    if(job.invoiceNo||['invoiced','paid','late'].includes(job.paymentStatus))invoiced+=c.ttc;
+  }
+  if($('technicalCards'))$('technicalCards').innerHTML=card('Chantiers',selected.length)+card('Exploitations',tech.farms.size)+card('Bovins',tech.animals)+card('Pieds réalisés',tech.feet)+card('Pansements',tech.band)+card('Talonnettes',tech.blocks)+card('À contrôler',tech.review)+card('Problèmes relevés',Object.values(tech.issues).reduce((a,b)=>a+b,0));
+  if($('technicalTables'))$('technicalTables').innerHTML=`<div class="balanceGrid"><div class="panel"><h3>Problèmes rencontrés</h3>${objTable(tech.issues,'Problème','Nombre')}</div><div class="panel"><h3>Par catégorie</h3>${objTable(tech.categories,'Catégorie','Bovins')}</div><div class="panel"><h3>Par race</h3>${objTable(tech.races,'Race','Bovins')}</div><div class="panel"><h3>Par département</h3>${objTable(tech.departments,'Département','Chantiers')}</div><div class="panel"><h3>Pieds atteints</h3>${objTable(Object.fromEntries(Object.entries(tech.affectedFeet).map(([k,v])=>[Object.fromEntries(feet)[k]||k,v])),'Pied','Lésions')}</div><div class="panel"><h3>Onglons atteints</h3>${objTable({'Interne':tech.clawSides.Int||0,'Externe':tech.clawSides.Ext||0},'Onglon','Lésions')}</div></div>`;
+  const co=currentBalanceCosts();
+  if($('routeStart'))$('routeStart').value=co.routeStart||settings.defaultRouteStart||'Pontis-de-Rivière (31)';
+  if($('routeKm'))$('routeKm').value=co.km||'';
+  if($('routeKmRate'))$('routeKmRate').value=co.kmRate??settings.defaultKmRate??0.65;
+  [['costFuel','fuel'],['costToll','toll'],['costMaterial','material'],['costMeals','meals'],['costOther','other'],['costComment','comment']].forEach(([id,key])=>{if($(id)&&document.activeElement!==$(id))$(id).value=co[key]||'';});
+  if($('routeReturnHome'))$('routeReturnHome').checked=co.returnHome!==false;
+  const km=+$('routeKm')?.value||+co.km||0,kmRate=+$('routeKmRate')?.value||+co.kmRate||+settings.defaultKmRate||0;
+  const roadCost=km*kmRate,otherCosts=['costFuel','costToll','costMaterial','costMeals','costOther'].reduce((sum,id)=>sum+(+$(id)?.value||0),0),totalCosts=roadCost+otherCosts,result=ht-totalCosts;
+  const avgAnimal=tech.animals?ht/tech.animals:0,avgJob=selected.length?ht/selected.length:0;
+  if($('economicCards'))$('economicCards').innerHTML=card('CA HT',euro(ht))+card('CA TTC',euro(ttc))+card('Facturé TTC',euro(invoiced))+card('Encaissé',euro(paid))+card('Reste à encaisser',euro(pending))+card('Kilomètres',km.toLocaleString('fr-FR'))+card('Coût tournée',euro(roadCost))+card('Résultat simplifié',euro(result));
+  if($('economicTables'))$('economicTables').innerHTML=`<div class="balanceGrid"><div class="panel"><h3>Rentabilité</h3><table><tr><th>Indicateur</th><th>Valeur</th></tr><tr><td>Prix moyen par chantier</td><td>${euro(avgJob)}</td></tr><tr><td>Prix moyen par bovin</td><td>${euro(avgAnimal)}</td></tr><tr><td>Coût total saisi</td><td>${euro(totalCosts)}</td></tr><tr><td>Résultat simplifié HT</td><td>${euro(result)}</td></tr><tr><td>CA HT / km</td><td>${euro(km?ht/km:0)}</td></tr></table></div><div class="panel"><h3>Suivi comptable</h3><table><tr><th>État</th><th>Montant TTC</th></tr><tr><td>Facturé</td><td>${euro(invoiced)}</td></tr><tr><td>Réglé</td><td>${euro(paid)}</td></tr><tr><td>En attente</td><td>${euro(pending)}</td></tr></table></div></div>`;
+}
+
+function saveCosts(){
+  const key=balanceCostKey();costs[key]={routeStart:$('routeStart')?.value||settings.defaultRouteStart,km:+$('routeKm')?.value||0,kmRate:+$('routeKmRate')?.value||+settings.defaultKmRate||0,returnHome:$('routeReturnHome')?.checked!==false,fuel:+$('costFuel')?.value||0,toll:+$('costToll')?.value||0,material:+$('costMaterial')?.value||0,meals:+$('costMeals')?.value||0,other:+$('costOther')?.value||0,comment:$('costComment')?.value||''};localStorage.setItem('parage.costs',JSON.stringify(costs));saveAll();cloudBackup(false);renderStats();toast('Frais et kilomètres enregistrés');
+}
+function resetBalanceFilters(){
+  ['filterDepartment','filterRace','filterCategory','filterIssue','filterCare'].forEach(id=>{if($(id))$(id).value='';});['filterFarm','filterTown'].forEach(id=>{if($(id))$(id).value='';});const d=new Date(),first=new Date(d.getFullYear(),d.getMonth(),1);$('filterStart').value=first.toISOString().slice(0,10);$('filterEnd').value=today();renderStats();
+}
+function exportFilteredBalance(){
+  const {filters,selected}=filteredBalanceData();const rows=[['Date','Cheptel','Élevage','Département','Race','N° bovin','Catégorie','Pieds','Problèmes','Soins','HT chantier','TTC chantier']];
+  for(const {job,animals} of selected){const c=calc(job);for(const a of animals){ensureWorkedFeet(a);const probs=[],soins=[];for(const [k,d] of Object.entries(a.claws||{})){for(const x of d.issues||[])probs.push(`${k}: ${x}`);for(const x of d.care||[])soins.push(`${k}: ${x}`);}rows.push([job.date,job.cheptel,job.clientName,job.department,job.race,a.number,categoryLabels[a.category]||a.category,(a.workedFeet||[]).map(x=>Object.fromEntries(feet)[x]||x).join(' | '),probs.join(' | '),soins.join(' | '),c.ht,c.ttc]);}}
+  const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n');download(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),`Bilan_${activeBalanceTab}_${filters.start||'debut'}_${filters.end||'fin'}.csv`);toast('Bilan filtré exporté');
+}
+
 async function secureInit(){
   $('loginSupabaseUrl').value=localStorage.getItem('parage.supabaseUrl')||DEFAULT_SUPABASE_URL;
   $('loginSupabaseKey').value=localStorage.getItem('parage.supabaseKey')||'';
   await init();
-  document.querySelector('.versionBadge').textContent='v3.0';
+  document.querySelector('.versionBadge').textContent='v3.1';
   if(authSession?.access_token){
     try{await loadCurrentProfile();await enterApplication();return;}catch(e){if(!(await refreshAuthSession())){authSession=null;localStorage.removeItem('parage.authSession');}else{try{await loadCurrentProfile();await enterApplication();return;}catch{}}}
   }

@@ -40,3 +40,12 @@ header .appLogo{width:330px;height:96px;max-width:42vw;object-fit:contain;object
 
 /* ===== V3.0 : authentification et rôles ===== */
 .loginScreen{position:fixed;inset:0;z-index:9999;background:linear-gradient(145deg,#fff4f9,#f7c9dd);display:flex;align-items:center;justify-content:center;padding:20px}.loginScreen.hidden{display:none}.loginCard{width:min(430px,100%);background:white;border:2px solid #efb5d0;border-radius:24px;padding:26px;box-shadow:0 18px 55px #7a19442b}.loginCard img{display:block;width:240px;max-width:80%;margin:0 auto 10px}.loginCard h1{text-align:center;color:#65243f;margin:4px 0}.loginCard p{text-align:center;color:#7b5364}.loginCard label{margin:12px 0}.loginCard button{width:100%;margin-top:8px}.linkButton{background:transparent;border:0;color:#b83278;text-decoration:underline}.cloudConfigBox{padding:12px;background:#fff5fa;border:1px solid #efb5d0;border-radius:12px;margin-bottom:12px}.loginMessage{min-height:24px;margin-top:10px;text-align:center;font-weight:700;color:#a1265f}.userBadge{background:#fff0f7;border:1px solid #eaacc9;color:#8b2555;padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px}.logoutBtn{padding:6px 9px;font-size:12px}.rolePill{display:inline-block;border-radius:999px;padding:4px 9px;background:#f7dbe8;color:#7c234d;font-weight:700}.roleSelect{max-width:170px}.readOnlyNote{padding:10px 12px;border-left:5px solid #b83278;background:#fff1f7;border-radius:8px;margin:10px 0}.accountingRow.readonly input,.accountingRow.readonly select{pointer-events:none;background:#f1f1f1;color:#666}.hiddenByRole{display:none!important}@media(max-width:700px){.headerStatus{gap:4px}.userBadge{max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.logoutBtn{display:none!important}}
+
+/* V3.1 — bilans séparés */
+.filtersPanel{border-left:5px solid var(--green)}
+.balanceGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+#technicalBalance[hidden],#economicBalance[hidden]{display:none!important}
+#technicalTab,#economicTab{min-width:160px}
+.filtersPanel .grid3{align-items:end}
+@media(max-width:760px){.balanceGrid{grid-template-columns:1fr}.filtersPanel .grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.filtersPanel .grid3{grid-template-columns:1fr}#technicalTab,#economicTab{width:100%}}
