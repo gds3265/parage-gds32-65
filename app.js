@@ -53,7 +53,7 @@ let settings = Object.assign({
 }, JSON.parse(localStorage.getItem('parage.settings') || '{}'));
 let costs = JSON.parse(localStorage.getItem('parage.costs') || '{}');
 let addressOverrides = JSON.parse(localStorage.getItem('parage.addressOverrides') || '{}');
-const APP_VERSION='3.1';
+const APP_VERSION='3.2';
 
 function saveAll() {
   localStorage.setItem('parage.jobs', JSON.stringify(jobs));
@@ -1193,7 +1193,7 @@ renderHome = function(){
 /* =====================================================================
    V3.0 — Connexion Supabase, rôles et base partagée
    ===================================================================== */
-const APP_VERSION_FINAL = '3.1.1';
+const APP_VERSION_FINAL = '3.2';
 const DEFAULT_SUPABASE_URL = 'https://kwbkqdkzdrjoxpzvfztg.supabase.co';
 let authSession = JSON.parse(localStorage.getItem('parage.authSession') || 'null');
 let currentProfile = null;
@@ -1462,9 +1462,9 @@ function renderStats(){
   if($('technicalCards'))$('technicalCards').innerHTML=card('Chantiers',selected.length)+card('Exploitations',tech.farms.size)+card('Bovins',tech.animals)+card('Pieds réalisés',tech.feet)+card('Pansements',tech.band)+card('Talonnettes',tech.blocks)+card('À contrôler',tech.review)+card('Problèmes relevés',Object.values(tech.issues).reduce((a,b)=>a+b,0));
   if($('technicalTables'))$('technicalTables').innerHTML=`<div class="balanceGrid"><div class="panel"><h3>Problèmes rencontrés</h3>${objTable(tech.issues,'Problème','Nombre')}</div><div class="panel"><h3>Par catégorie</h3>${objTable(tech.categories,'Catégorie','Bovins')}</div><div class="panel"><h3>Par race</h3>${objTable(tech.races,'Race','Bovins')}</div><div class="panel"><h3>Par département</h3>${objTable(tech.departments,'Département','Chantiers')}</div><div class="panel"><h3>Pieds atteints</h3>${objTable(Object.fromEntries(Object.entries(tech.affectedFeet).map(([k,v])=>[Object.fromEntries(feet)[k]||k,v])),'Pied','Lésions')}</div><div class="panel"><h3>Onglons atteints</h3>${objTable({'Interne':tech.clawSides.Int||0,'Externe':tech.clawSides.Ext||0},'Onglon','Lésions')}</div></div>`;
   const co=currentBalanceCosts();
-  if($('routeStart'))$('routeStart').value=co.routeStart||settings.defaultRouteStart||'Pontis-de-Rivière (31)';
-  if($('routeKm'))$('routeKm').value=co.km||'';
-  if($('routeKmRate'))$('routeKmRate').value=co.kmRate??settings.defaultKmRate??0.65;
+  if($('routeStart')&&document.activeElement!==$('routeStart'))$('routeStart').value=co.routeStart||settings.defaultRouteStart||'Pontis-de-Rivière (31)';
+  if($('routeKm')&&document.activeElement!==$('routeKm'))$('routeKm').value=co.km||'';
+  if($('routeKmRate')&&document.activeElement!==$('routeKmRate'))$('routeKmRate').value=co.kmRate??settings.defaultKmRate??0.65;
   [['costFuel','fuel'],['costToll','toll'],['costMaterial','material'],['costMeals','meals'],['costOther','other'],['costComment','comment']].forEach(([id,key])=>{if($(id)&&document.activeElement!==$(id))$(id).value=co[key]||'';});
   if($('routeReturnHome'))$('routeReturnHome').checked=co.returnHome!==false;
   const km=+$('routeKm')?.value||+co.km||0,kmRate=+$('routeKmRate')?.value||+co.kmRate||+settings.defaultKmRate||0;
@@ -1612,3 +1612,127 @@ finishJob=async function(){
 };
 
 printProforma=function(){syncJob();openPdfPreview(proformaPdfBlob(current),`Proforma_${current.cheptel||'chantier'}_${current.date}.pdf`,{validated:false});};
+
+/* ===== V3.2 : estimation automatique des tournées et données de pilotage ===== */
+const ROUTE_GEOCODE_CACHE_KEY='parage.routeGeocodeCache.v32';
+let routeGeocodeCacheV32=JSON.parse(localStorage.getItem(ROUTE_GEOCODE_CACHE_KEY)||'{}');
+let routeEstimateTimerV32=null;
+let routeEstimateBusyV32=false;
+
+function normalizedAddressV32(value){return String(value||'').trim().replace(/\s+/g,' ').toLowerCase();}
+function filteredJobsV32(){
+  const data=filteredBalanceData();
+  const seen=new Set();
+  return data.selected.map(x=>x.job).filter(j=>{if(seen.has(j.id))return false;seen.add(j.id);return true;}).sort((a,b)=>`${a.date||''} ${a.start||''}`.localeCompare(`${b.date||''} ${b.start||''}`));
+}
+function routeSignatureV32(rows,start,returnHome){return JSON.stringify({start:normalizedAddressV32(start),returnHome,rows:rows.map(j=>[j.id,j.date,j.start,j.address,j.cpVille])});}
+function routeCostObjectV32(){const key=balanceCostKey();costs[key]=costs[key]||{};return costs[key];}
+function saveRouteCostObjectV32(){localStorage.setItem('parage.costs',JSON.stringify(costs));saveAll();}
+
+async function geocodeAddressV32(query){
+  const key=normalizedAddressV32(query);
+  if(!key)throw new Error('Adresse vide');
+  if(routeGeocodeCacheV32[key])return routeGeocodeCacheV32[key];
+  const url=`https://api-adresse.data.gouv.fr/search/?limit=1&q=${encodeURIComponent(query)}`;
+  const r=await fetch(url,{headers:{'Accept':'application/json'}});
+  if(!r.ok)throw new Error('Service de localisation indisponible');
+  const data=await r.json(),feature=data.features?.[0];
+  if(!feature)throw new Error(`Adresse non localisée : ${query}`);
+  const [lon,lat]=feature.geometry.coordinates;
+  const result={lon,lat,label:feature.properties?.label||query,score:feature.properties?.score||0};
+  routeGeocodeCacheV32[key]=result;localStorage.setItem(ROUTE_GEOCODE_CACHE_KEY,JSON.stringify(routeGeocodeCacheV32));
+  return result;
+}
+async function routeOsrmV32(points){
+  if(points.length<2)return {distance:0,duration:0,legs:[]};
+  const coords=points.map(p=>`${p.lon},${p.lat}`).join(';');
+  const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=false&steps=false&alternatives=false`);
+  if(!r.ok)throw new Error('Service d’itinéraire indisponible');
+  const data=await r.json();if(data.code!=='Ok'||!data.routes?.length)throw new Error('Itinéraire introuvable');
+  return data.routes[0];
+}
+function formatDurationV32(seconds){
+  const mins=Math.round((+seconds||0)/60),h=Math.floor(mins/60),m=mins%60;
+  return h?`${h} h ${String(m).padStart(2,'0')}`:`${m} min`;
+}
+function routeLabelForJobV32(j){return `${j.clientName||j.cheptel||'Élevage'} (${j.cpVille||j.address||''})`;}
+function markRouteAsManual(){
+  const co=routeCostObjectV32();co.routeMode='manual';co.km=+$('routeKm')?.value||0;co.routeStart=$('routeStart')?.value||settings.defaultRouteStart;co.returnHome=$('routeReturnHome')?.checked!==false;co.autoSignature='';saveRouteCostObjectV32();
+  const s=$('routeEstimateStatus');if(s){s.className='routeEstimateStatus manual';s.textContent='Kilométrage manuel conservé. Cliquez sur « Calculer automatiquement » pour refaire une estimation.';}
+}
+function scheduleAutomaticRoute(force=false){
+  clearTimeout(routeEstimateTimerV32);
+  if(activeBalanceTab!=='economic')return;
+  routeEstimateTimerV32=setTimeout(()=>estimateFilteredRoutes(force),force?50:900);
+}
+async function estimateFilteredRoutes(force=false){
+  if(routeEstimateBusyV32)return;
+  const rows=filteredJobsV32(),co=routeCostObjectV32(),start=($('routeStart')?.value||settings.defaultRouteStart||'Pontis-de-Rivière (31)').trim(),returnHome=$('routeReturnHome')?.checked!==false;
+  if(!rows.length){renderRouteEstimateV32();return;}
+  const signature=routeSignatureV32(rows,start,returnHome);
+  if(!force&&(co.routeMode==='manual'||co.autoSignature===signature))return renderRouteEstimateV32();
+  if(!navigator.onLine){const s=$('routeEstimateStatus');if(s)s.textContent='Hors connexion : dernière estimation conservée. Le calcul automatique reprendra avec le réseau.';return;}
+  routeEstimateBusyV32=true;
+  const status=$('routeEstimateStatus');if(status){status.className='routeEstimateStatus loading';status.textContent='Calcul automatique de la tournée en cours…';}
+  try{
+    const origin=await geocodeAddressV32(start),days={};
+    rows.forEach(j=>(days[j.date||'Sans date']=days[j.date||'Sans date']||[]).push(j));
+    let totalDistance=0,totalDuration=0;const detail=[];const warnings=[];
+    for(const [date,dayJobs] of Object.entries(days)){
+      const located=[];
+      for(const j of dayJobs){
+        const query=[j.address,j.cpVille,'France'].filter(Boolean).join(', ');
+        try{located.push({job:j,coord:await geocodeAddressV32(query)});}catch(e){warnings.push(`${routeLabelForJobV32(j)} : adresse non localisée`);}
+      }
+      if(!located.length)continue;
+      const points=[origin,...located.map(x=>x.coord),...(returnHome?[origin]:[])];
+      const route=await routeOsrmV32(points);totalDistance+=route.distance||0;totalDuration+=route.duration||0;
+      const labels=[start,...located.map(x=>routeLabelForJobV32(x.job)),...(returnHome?[start]:[])];
+      (route.legs||[]).forEach((leg,i)=>detail.push({date,from:labels[i],to:labels[i+1],km:(leg.distance||0)/1000,duration:leg.duration||0}));
+    }
+    co.routeMode='auto';co.routeStart=start;co.returnHome=returnHome;co.km=Math.round(totalDistance/100)/10;co.routeDuration=Math.round(totalDuration);co.routeDetails=detail;co.routeWarnings=warnings;co.autoSignature=signature;co.routeUpdatedAt=new Date().toISOString();
+    if($('routeKm'))$('routeKm').value=co.km;saveRouteCostObjectV32();
+    renderStats();toast(`Tournée estimée : ${co.km.toLocaleString('fr-FR')} km`);
+  }catch(e){console.error(e);if(status){status.className='routeEstimateStatus error';status.textContent=`Estimation impossible : ${e.message}. Vous pouvez saisir les kilomètres manuellement.`;}}
+  finally{routeEstimateBusyV32=false;}
+}
+function renderRouteEstimateV32(){
+  const co=currentBalanceCosts(),status=$('routeEstimateStatus'),details=$('routeEstimateDetails');if(!status||!details)return;
+  if(co.routeMode==='auto'){
+    status.className='routeEstimateStatus success';status.innerHTML=`<b>Estimation automatique :</b> ${Number(co.km||0).toLocaleString('fr-FR')} km · ${formatDurationV32(co.routeDuration)}${co.routeUpdatedAt?` · calculée le ${new Date(co.routeUpdatedAt).toLocaleString('fr-FR')}`:''}. Vous pouvez corriger le kilométrage.`;
+  }else if(co.routeMode==='manual'){
+    status.className='routeEstimateStatus manual';status.textContent='Kilométrage saisi manuellement. Le calcul automatique reste disponible.';
+  }else status.className='routeEstimateStatus';
+  const rows=co.routeDetails||[];
+  details.innerHTML=rows.length?`<div class="routeTableWrap"><table><tr><th>Date</th><th>De</th><th>Vers</th><th>Distance</th><th>Temps</th></tr>${rows.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.from)}</td><td>${esc(x.to)}</td><td>${Number(x.km).toLocaleString('fr-FR',{maximumFractionDigits:1})} km</td><td>${formatDurationV32(x.duration)}</td></tr>`).join('')}</table></div>${(co.routeWarnings||[]).length?`<div class="routeWarnings"><b>Adresses non prises en compte :</b><br>${co.routeWarnings.map(esc).join('<br>')}</div>`:''}`:'';
+}
+function monthlyAnalyticsV32(){
+  const selected=filteredJobsV32(),groups={};
+  selected.forEach(j=>{const m=(j.date||'').slice(0,7)||'Sans date',c=calc(j),g=groups[m]||(groups[m]={jobs:0,animals:0,feet:0,ht:0,ttc:0});g.jobs++;g.animals+=c.n;g.feet+=c.pairs*2+c.single;g.ht+=c.ht;g.ttc+=c.ttc;});
+  return groups;
+}
+function miniBarsV32(groups,key,label,formatter=v=>v){
+  const entries=Object.entries(groups).sort((a,b)=>a[0].localeCompare(b[0])),max=Math.max(1,...entries.map(x=>x[1][key]||0));
+  return `<div class="miniBars">${entries.map(([m,v])=>`<div class="miniBarRow"><span>${m==='Sans date'?m:m.split('-').reverse().join('/')}</span><div class="miniBarTrack"><i style="width:${Math.max(2,(v[key]||0)/max*100)}%"></i></div><b>${formatter(v[key]||0)}</b></div>`).join('')||'<p>Aucune donnée.</p>'}</div>`;
+}
+function renderV32DataPanels(){
+  renderRouteEstimateV32();
+  const groups=monthlyAnalyticsV32(),co=currentBalanceCosts(),duration=+co.routeDuration||0,km=+$('routeKm')?.value||+co.km||0;
+  const {selected}=filteredBalanceData();let ht=0,animals=0;selected.forEach(x=>{const c=calc(x.job);ht+=c.ht;animals+=x.animals.length;});
+  if($('economicCards'))$('economicCards').innerHTML+=card('Temps de route estimé',formatDurationV32(duration))+card('CA HT / heure de route',euro(duration?ht/(duration/3600):0));
+  if($('economicTables'))$('economicTables').innerHTML+=`<div class="balanceGrid v32Analytics"><div class="panel"><h3>Évolution mensuelle du CA HT</h3>${miniBarsV32(groups,'ht','CA',euro)}</div><div class="panel"><h3>Évolution mensuelle des bovins</h3>${miniBarsV32(groups,'animals','Bovins',v=>v.toLocaleString('fr-FR'))}</div></div>`;
+  if($('technicalTables'))$('technicalTables').innerHTML+=`<div class="balanceGrid v32Analytics"><div class="panel"><h3>Bovins par mois</h3>${miniBarsV32(groups,'animals','Bovins',v=>v.toLocaleString('fr-FR'))}</div><div class="panel"><h3>Pieds réalisés par mois</h3>${miniBarsV32(groups,'feet','Pieds',v=>v.toLocaleString('fr-FR'))}</div></div>`;
+}
+const renderStatsBaseV32=renderStats;
+renderStats=function(){
+  renderStatsBaseV32();renderV32DataPanels();
+  const co=currentBalanceCosts(),rows=filteredJobsV32(),start=$('routeStart')?.value||settings.defaultRouteStart,ret=$('routeReturnHome')?.checked!==false,signature=routeSignatureV32(rows,start,ret);
+  if(activeBalanceTab==='economic'&&rows.length&&co.routeMode!=='manual'&&co.autoSignature!==signature)scheduleAutomaticRoute(false);
+};
+const showBalanceTabBaseV32=showBalanceTab;
+showBalanceTab=function(tab){showBalanceTabBaseV32(tab);if(tab==='economic')scheduleAutomaticRoute(false);};
+const saveCostsBaseV32=saveCosts;
+saveCosts=function(){
+  const co=routeCostObjectV32(),routeMeta={routeMode:co.routeMode,routeDuration:co.routeDuration,routeDetails:co.routeDetails,routeWarnings:co.routeWarnings,autoSignature:co.autoSignature,routeUpdatedAt:co.routeUpdatedAt};
+  saveCostsBaseV32();Object.assign(routeCostObjectV32(),routeMeta);saveRouteCostObjectV32();renderStats();
+};
