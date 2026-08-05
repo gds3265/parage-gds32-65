@@ -110,3 +110,9 @@ body.mode-terrain #nav button{font-size:15px;padding:12px 18px}
 .historyVisit{border:1px solid #ead9e2;border-radius:12px;padding:12px;margin:10px 0;background:#fffafd}
 .historyVisit h4{margin:0 0 7px;color:#9d2864}.historyVisit p{margin:5px 0}.historyVisit ul{margin:6px 0;padding-left:20px}
 @media(max-width:650px){.bovineHistoryBanner{align-items:stretch;flex-direction:column}.bovineHistoryBanner button{width:100%}.previousFootMark{display:block;margin:5px auto 0;width:max-content}}
+
+/* V4.0.1 correctifs */
+.pdfAndroidPanel{background:white;border-radius:14px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;color:#4a2638}
+.pdfAndroidPanel .pdfIcon{width:78px;height:92px;border:3px solid #b83278;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#b83278;background:#fff7fb}
+.pdfAndroidPanel h3{margin:0;font-size:24px}.pdfAndroidPanel p{max-width:520px;margin:0 0 8px;color:#815267}.pdfAndroidPanel button{width:min(420px,100%);padding:14px;font-size:16px}
+@media(max-width:650px){.pdfToolbar strong{width:100%;font-size:14px}.pdfToolbar button{flex:1}.pdfAndroidPanel{padding:18px}.animalActions{flex-direction:row}.animalActions .big{width:auto;min-width:0;font-size:15px;padding:12px 8px}}

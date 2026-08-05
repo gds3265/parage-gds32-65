@@ -339,7 +339,7 @@ function renderAnimals() {
         <div class="feet">${feet.map(f => footHTML(animal, f[0], f[1])).join('')}</div>
         <label>Observation générale<input value="${esc(animal.notes)}" onchange="updateAnimal('${animal.id}','notes',this.value)"></label>
         <label class="checkNextBottom"><input type="checkbox" ${animal.checkNext ? 'checked' : ''} onchange="updateAnimal('${animal.id}','checkNext',this.checked)"> Bovin à contrôler à la prochaine visite</label>
-        <div class="animalActions"><button class="primary big" onclick="completeAnimal('${animal.id}')">✓ Bovin terminé → suivant</button><button class="lastAnimalBtn big" onclick="completeLastAnimal('${animal.id}')">Dernier bovin → récapitulatif</button></div>
+        <div class="animalActions"><button class="lastAnimalBtn big" onclick="completeLastAnimal('${animal.id}')">✓ Dernier bovin → récapitulatif</button><button class="primary big" onclick="completeAnimal('${animal.id}')">Bovin suivant →</button></div>
       `}
     `;
     $('animals').appendChild(div);
@@ -1495,7 +1495,7 @@ function renderStats(){
   if($('routeKm')&&document.activeElement!==$('routeKm'))$('routeKm').value=co.km||'';
   if($('routeKmRate')&&document.activeElement!==$('routeKmRate'))$('routeKmRate').value=co.kmRate??settings.defaultKmRate??0.65;
   [['costFuel','fuel'],['costToll','toll'],['costMaterial','material'],['costMeals','meals'],['costOther','other'],['costComment','comment']].forEach(([id,key])=>{if($(id)&&document.activeElement!==$(id))$(id).value=co[key]||'';});
-  if($('routeReturnHome'))$('routeReturnHome').checked=co.returnHome!==false;
+  if($('routeReturnHome')){$('routeReturnHome').checked=true;$('routeReturnHome').disabled=true;}
   const km=+$('routeKm')?.value||+co.km||0,kmRate=+$('routeKmRate')?.value||+co.kmRate||+settings.defaultKmRate||0;
   const roadCost=km*kmRate,otherCosts=['costFuel','costToll','costMaterial','costMeals','costOther'].reduce((sum,id)=>sum+(+$(id)?.value||0),0),totalCosts=roadCost+otherCosts,result=ht-totalCosts;
   const avgAnimal=tech.animals?ht/tech.animals:0,avgJob=selected.length?ht/selected.length:0;
@@ -1504,7 +1504,7 @@ function renderStats(){
 }
 
 function saveCosts(){
-  const key=balanceCostKey();costs[key]={routeStart:$('routeStart')?.value||settings.defaultRouteStart,km:+$('routeKm')?.value||0,kmRate:+$('routeKmRate')?.value||+settings.defaultKmRate||0,returnHome:$('routeReturnHome')?.checked!==false,fuel:+$('costFuel')?.value||0,toll:+$('costToll')?.value||0,material:+$('costMaterial')?.value||0,meals:+$('costMeals')?.value||0,other:+$('costOther')?.value||0,comment:$('costComment')?.value||''};localStorage.setItem('parage.costs',JSON.stringify(costs));saveAll();cloudBackup(false);renderStats();toast('Frais et kilomètres enregistrés');
+  const key=balanceCostKey();costs[key]={routeStart:$('routeStart')?.value||settings.defaultRouteStart,km:+$('routeKm')?.value||0,kmRate:+$('routeKmRate')?.value||+settings.defaultKmRate||0,returnHome:true,fuel:+$('costFuel')?.value||0,toll:+$('costToll')?.value||0,material:+$('costMaterial')?.value||0,meals:+$('costMeals')?.value||0,other:+$('costOther')?.value||0,comment:$('costComment')?.value||''};localStorage.setItem('parage.costs',JSON.stringify(costs));saveAll();cloudBackup(false);renderStats();toast('Frais et kilomètres enregistrés');
 }
 function resetBalanceFilters(){
   ['filterDepartment','filterRace','filterCategory','filterIssue','filterCare'].forEach(id=>{if($(id))$(id).value='';});['filterFarm','filterTown'].forEach(id=>{if($(id))$(id).value='';});const d=new Date(),first=new Date(d.getFullYear(),d.getMonth(),1);$('filterStart').value=first.toISOString().slice(0,10);$('filterEnd').value=today();renderStats();
@@ -1597,8 +1597,16 @@ function makeProformaPdfV311(job){
     if(y-h<95) break;
     rect(ax[0],y-h,ax[5]-ax[0],h);ax.slice(1,-1).forEach(x=>line(x,y-h,x,y));
     wrapped.forEach((ls,i)=>ls.forEach((t,j)=>text(ax[i]+3,y-11-j*9,7,t)));
-    if(a.checkNext) text(ax[4]+3,y-h+3,6.5,'A CONTROLER',true);
     y-=h;
+    if(a.checkNext){
+      const reviewH=15;
+      if(y-reviewH>=90){
+        fillRect(ax[0],y-reviewH,ax[5]-ax[0],reviewH,.96);
+        rect(ax[0],y-reviewH,ax[5]-ax[0],reviewH);
+        text(ax[0]+5,y-10,7,'BOVIN A CONTROLER A LA PROCHAINE VISITE',true);
+        y-=reviewH;
+      }
+    }
   }
   y-=12;text(margin,y,8,`Modalite : ${job.paymentTiming||'A reception'}     Mode : ${job.paymentMethod||'Cheque'}`,true);
   y-=13;text(margin,y,7.5,'Paiement a 20 jours - IBAN FR76 1690 6010 2003 4001 9914 139 - BIC AGRIFRPP869');
@@ -1618,14 +1626,26 @@ proformaPdfBlob=function(job){return new Blob([makeProformaPdfV311(job)],{type:'
 openPdfPreview=function(blob,name,options={}){
   document.querySelector('.pdfOverlay')?.remove();
   const url=URL.createObjectURL(blob), validated=!!options.validated;
+  const isAndroid=/Android/i.test(navigator.userAgent);
   const overlay=document.createElement('div');overlay.className='pdfOverlay';
-  overlay.innerHTML=`<div class="pdfToolbar"><strong>${esc(name)}</strong><button class="primary" id="pdfShare">Partager / imprimer</button><button id="pdfClose">Retour a l application</button></div><iframe title="Apercu pro forma" src="${url}"></iframe>`;
+  const viewer=isAndroid
+    ? `<div class="pdfAndroidPanel"><div class="pdfIcon">PDF</div><h3>Pro forma prêt</h3><p>Sur Android, utilisez l’un des boutons ci-dessous pour ouvrir, télécharger ou partager le document.</p><button class="primary" id="pdfOpenExternal">Ouvrir avec le lecteur PDF</button><button id="pdfDownload">Télécharger le PDF</button><button id="pdfShareAndroid">Partager le PDF</button></div>`
+    : `<iframe title="Apercu pro forma" src="${url}"></iframe>`;
+  overlay.innerHTML=`<div class="pdfToolbar"><strong>${esc(name)}</strong><button class="primary" id="pdfShare">Partager / imprimer</button><button id="pdfClose">Retour a l application</button></div>${viewer}`;
   document.body.appendChild(overlay);
-  overlay.querySelector('#pdfClose').onclick=()=>{
+  const closePreview=()=>{
     URL.revokeObjectURL(url);overlay.remove();
     if(validated){current=blankJob();chantierStarted=false;updateChantierUI();showView('home');toast('OK - chantier enregistré et synchronisé');}
   };
+  overlay.querySelector('#pdfClose').onclick=closePreview;
   overlay.querySelector('#pdfShare').onclick=()=>shareBlob(blob,name);
+  if(isAndroid){
+    overlay.querySelector('#pdfOpenExternal').onclick=()=>{
+      const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
+    };
+    overlay.querySelector('#pdfDownload').onclick=()=>download(blob,name);
+    overlay.querySelector('#pdfShareAndroid').onclick=()=>shareBlob(blob,name);
+  }
 };
 
 finishJob=async function(){
@@ -1686,7 +1706,7 @@ function formatDurationV32(seconds){
 }
 function routeLabelForJobV32(j){return `${j.clientName||j.cheptel||'Élevage'} (${j.cpVille||j.address||''})`;}
 function markRouteAsManual(){
-  const co=routeCostObjectV32();co.routeMode='manual';co.km=+$('routeKm')?.value||0;co.routeStart=$('routeStart')?.value||settings.defaultRouteStart;co.returnHome=$('routeReturnHome')?.checked!==false;co.autoSignature='';saveRouteCostObjectV32();
+  const co=routeCostObjectV32();co.routeMode='manual';co.km=+$('routeKm')?.value||0;co.routeStart=$('routeStart')?.value||settings.defaultRouteStart;co.returnHome=true;co.autoSignature='';saveRouteCostObjectV32();
   const s=$('routeEstimateStatus');if(s){s.className='routeEstimateStatus manual';s.textContent='Kilométrage manuel conservé. Cliquez sur « Calculer automatiquement » pour refaire une estimation.';}
 }
 function scheduleAutomaticRoute(force=false){
@@ -1696,7 +1716,7 @@ function scheduleAutomaticRoute(force=false){
 }
 async function estimateFilteredRoutes(force=false){
   if(routeEstimateBusyV32)return;
-  const rows=filteredJobsV32(),co=routeCostObjectV32(),start=($('routeStart')?.value||settings.defaultRouteStart||'Pontis-de-Rivière (31)').trim(),returnHome=$('routeReturnHome')?.checked!==false;
+  const rows=filteredJobsV32(),co=routeCostObjectV32(),start=($('routeStart')?.value||settings.defaultRouteStart||'Pontis-de-Rivière (31)').trim(),returnHome=true;
   if(!rows.length){renderRouteEstimateV32();return;}
   const signature=routeSignatureV32(rows,start,returnHome);
   if(!force&&(co.routeMode==='manual'||co.autoSignature===signature))return renderRouteEstimateV32();
@@ -1755,7 +1775,7 @@ function renderV32DataPanels(){
 const renderStatsBaseV32=renderStats;
 renderStats=function(){
   renderStatsBaseV32();renderV32DataPanels();
-  const co=currentBalanceCosts(),rows=filteredJobsV32(),start=$('routeStart')?.value||settings.defaultRouteStart,ret=$('routeReturnHome')?.checked!==false,signature=routeSignatureV32(rows,start,ret);
+  const co=currentBalanceCosts(),rows=filteredJobsV32(),start=$('routeStart')?.value||settings.defaultRouteStart,ret=true,signature=routeSignatureV32(rows,start,ret);
   if(activeBalanceTab==='economic'&&rows.length&&co.routeMode!=='manual'&&co.autoSignature!==signature)scheduleAutomaticRoute(false);
 };
 const showBalanceTabBaseV32=showBalanceTab;
@@ -2058,7 +2078,7 @@ const sharedPayloadV4Base=sharedPayload;
 sharedPayload=function(){return Object.assign({},sharedPayloadV4Base(),{auditLogs,version:APP_VERSION_V4});};
 
 function updateV4Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0');document.title='Suivi Parage v4.0';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.1');document.title='Suivi Parage v4.0.1';
   const start=$('journalStart'),end=$('journalEnd');if(start&&!start.value){const d=new Date();d.setDate(d.getDate()-30);start.value=d.toISOString().slice(0,10);}if(end&&!end.value)end.value=today();
 }
 updateV4Identity();
