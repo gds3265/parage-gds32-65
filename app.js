@@ -2509,3 +2509,102 @@ enterApplication=async function(){
   return r;
 };
 setTimeout(async()=>{try{await importHistoricalDataV402(false);}catch(e){}updateV405Identity();renderAccounting();},3000);
+
+/* =====================================================================
+   V4.0.6 — Détail comptable garanti depuis le bilan
+   ===================================================================== */
+const APP_VERSION_V406='4.0.6';
+let accountingSnapshotV406=null;
+
+function snapshotKeyV406(j){
+  return j?.id||j?.historicalFingerprint||`${j?.date||''}|${j?.cheptel||''}|${accountingAmountV403(j||{})}`;
+}
+function resolveSnapshotRowsV406(snapshot){
+  if(!snapshot?.keys?.length)return [];
+  const keys=new Set(snapshot.keys);
+  return jobs.filter(j=>keys.has(snapshotKeyV406(j))||keys.has(j.id)||keys.has(j.historicalFingerprint));
+}
+function snapshotStatusV406(j){
+  if(isLateV404(j))return ['late','Impayée / retard'];
+  if(isPaidV403(j))return ['paid','Réglée'];
+  if(isOpenV404(j))return ['invoiced',j.paymentStatus==='partial'?'Partiellement réglée':'Facturée / attente'];
+  return accountingJobStatusV404(j);
+}
+function renderAccountingSnapshotV406(){
+  const host=$('accountingSummary');
+  if(!host||!accountingSnapshotV406)return;
+  const rows=resolveSnapshotRowsV406(accountingSnapshotV406)
+    .sort((a,b)=>(a.invoiceAt||a.date||'').localeCompare(b.invoiceAt||b.date||''));
+  const total=rows.reduce((s,j)=>s+accountingAmountV403(j),0);
+  const body=rows.map(j=>{
+    const st=snapshotStatusV406(j),c=calc(j);
+    return `<tr class="${st[0]==='late'?'lateRow':''}"><td>${fmtDate(j.date)}</td><td><b>${esc(j.clientName||'')}</b><br><small>${esc(j.cpVille||'')}</small></td><td>${esc(j.cheptel||'')}</td><td>${j.invoiceNo?esc(j.invoiceNo):'—'}</td><td>${fmtDate(j.invoiceAt||'')}</td><td><b>${euro(c.ttc)}</b></td><td><span class="status ${st[0]}">${st[1]}</span></td><td><button onclick="${j.importedHistory?`openHistoricalSummaryV402('${j.id}')`:`openStoredProformaForJob('${j.id}')`}">Voir le dossier</button></td></tr>`;
+  }).join('');
+  host.insertAdjacentHTML('afterbegin',`<div class="panel accountingSnapshotV406"><div class="toolbar"><div><h3>${esc(accountingSnapshotV406.label)}</h3><p><b>${rows.length} dossier(s) · ${euro(total)} TTC</b></p></div><button onclick="clearAccountingSnapshotV406()">Fermer ce détail</button></div><div class="tableScroll"><table><tr><th>Chantier</th><th>Éleveur</th><th>Cheptel</th><th>Facture</th><th>Facturé le</th><th>Montant</th><th>État</th><th></th></tr>${body||'<tr><td colspan="8"><b>Aucun dossier retrouvé.</b> Utilisez “Contrôler / réintégrer l’historique” dans Paramètres, puis revenez au bilan.</td></tr>'}</table></div></div>`);
+}
+function clearAccountingSnapshotV406(){
+  accountingSnapshotV406=null;
+  accountingDrilldownV405=null;
+  accountingFilterV403='all';
+  renderAccounting();
+}
+
+async function openAccountingFromBalanceV406(filter){
+  try{await importHistoricalDataV402(false);}catch(e){}
+  const selected=(filteredBalanceData()?.selected||[]).map(x=>x.job).filter(Boolean);
+  let matched=accountingJobsForFilterV405(selected,filter);
+  /* Repli fiable : si les objets du bilan ont été recalculés, recherche dans la base
+     avec exactement la même période et le même état comptable. */
+  if(!matched.length){
+    const start=$('filterStart')?.value||'',end=$('filterEnd')?.value||'';
+    const periodJobs=jobs.filter(j=>j&&j.status==='finished'&&!j.trashedAt&&!j.cancelledAt&&(!start||j.date>=start)&&(!end||j.date<=end));
+    matched=accountingJobsForFilterV405(periodJobs,filter);
+  }
+  accountingSnapshotV406={
+    keys:matched.map(snapshotKeyV406),
+    filter,
+    label:filter==='late'?'Détail des impayés / retards du bilan':filter==='open'?'Détail du reste à encaisser du bilan':filter==='paid'?'Détail des règlements du bilan':'Détail des dossiers du bilan'
+  };
+  accountingDrilldownV405=null;
+  accountingFilterV403='all';
+  if($('accountingStart')){$('accountingStart').value='';$('accountingStart').dataset.ready='1';}
+  if($('accountingEnd'))$('accountingEnd').value='';
+  if($('accountingSearch'))$('accountingSearch').value='';
+  showView('accounting');
+  renderAccounting();
+  setTimeout(()=>$('accountingSummary')?.scrollIntoView({behavior:'smooth',block:'start'}),80);
+}
+
+openAccountingFromBalanceV404=openAccountingFromBalanceV406;
+openAccountingFromBalanceV405=openAccountingFromBalanceV406;
+
+const renderAccountingV406Base=renderAccounting;
+renderAccounting=function(){
+  const r=renderAccountingV406Base();
+  renderAccountingSnapshotV406();
+  return r;
+};
+
+const renderStatsV406Base=renderStats;
+renderStats=function(){
+  const r=renderStatsV406Base();
+  document.querySelectorAll('[onclick*="openAccountingFromBalanceV404"],[onclick*="openAccountingFromBalanceV405"]').forEach(el=>{
+    const onclick=el.getAttribute('onclick')||'';
+    el.setAttribute('onclick',onclick.replace(/openAccountingFromBalanceV40[45]/g,'openAccountingFromBalanceV406'));
+  });
+  return r;
+};
+
+function updateV406Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.6');
+  document.title='Suivi Parage v4.0.6';
+}
+const enterApplicationV406Base=enterApplication;
+enterApplication=async function(){
+  const r=await enterApplicationV406Base();
+  try{await importHistoricalDataV402(false);}catch(e){}
+  updateV406Identity();
+  renderAccounting();
+  return r;
+};
+setTimeout(async()=>{try{await importHistoricalDataV402(false);}catch(e){}updateV406Identity();renderAccounting();},3400);

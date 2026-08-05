@@ -121,3 +121,10 @@ body.mode-terrain #nav button{font-size:15px;padding:12px 18px}
 
 /* V4.0.4 — détail comptable */
 .accountingSelectionTotal{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px;padding:12px 14px;border-radius:10px;background:#fff0f7;border:1px solid #efb6cf}.accountingSelectionTotal strong{font-size:20px;color:#a51f5d}.accountingTitleLine{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.historySourceBadge{display:inline-block;padding:3px 7px;border-radius:999px;background:#ece8ff;color:#5d4a94;font-size:11px;font-weight:700}.economicOutstandingPanel{margin-top:14px}.tableScroll{overflow-x:auto}.lateRow td{background:#fff0ef}.alertCard{border-color:#d84a62!important;background:#fff3f5!important}.alertCard b{color:#b52c47!important}
+
+/* V4.0.6 — liste garantie des dossiers ouverts depuis le bilan */
+.accountingSnapshotV406{border:3px solid #b83278;margin-bottom:16px;background:#fff8fc}
+.accountingSnapshotV406 h3{margin:0;color:#8d205a}
+.accountingSnapshotV406 p{margin:4px 0 0}
+.accountingSnapshotV406 table{min-width:940px}
+.accountingSnapshotV406 .lateRow{background:#fff0f0}
