@@ -2415,3 +2415,97 @@ function updateV404Identity(){document.querySelectorAll('.versionBadge').forEach
 const enterApplicationV404Base=enterApplication;
 enterApplication=async function(){const r=await enterApplicationV404Base();updateV404Identity();renderAccounting();return r;};
 setTimeout(()=>{updateV404Identity();renderAccounting();},2600);
+
+/* =====================================================================
+   V4.0.5 — Liaison fiable Bilan économique -> détail comptable
+   ===================================================================== */
+const APP_VERSION_V405='4.0.5';
+let accountingDrilldownV405=null;
+const accountingBaseRowsV405Original=accountingBaseRowsV403;
+const setAccountingFilterV405Original=setAccountingFilterV403;
+
+function accountingJobsForFilterV405(source,filter){
+  const rows=(source||[]).filter(j=>j&&j.status==='finished'&&!j.trashedAt&&!j.cancelledAt);
+  if(filter==='late')return rows.filter(isLateV404);
+  if(filter==='open')return rows.filter(isOpenV404);
+  if(filter==='paid')return rows.filter(isPaidV403);
+  if(filter==='to_invoice')return rows.filter(isToInvoiceV403);
+  return rows;
+}
+
+accountingBaseRowsV403=function(){
+  if(accountingDrilldownV405?.ids?.length){
+    const ids=new Set(accountingDrilldownV405.ids);
+    return jobs.filter(j=>ids.has(j.id)).sort((a,b)=>`${b.date||''} ${b.start||''}`.localeCompare(`${a.date||''} ${a.start||''}`));
+  }
+  return accountingBaseRowsV405Original();
+};
+
+setAccountingFilterV403=function(filter){
+  accountingDrilldownV405=null;
+  return setAccountingFilterV405Original(filter);
+};
+
+async function openAccountingFromBalanceV405(filter){
+  try{await importHistoricalDataV402(false);}catch(e){}
+  const selected=(filteredBalanceData()?.selected||[]).map(x=>x.job);
+  const matched=accountingJobsForFilterV405(selected,filter);
+  accountingDrilldownV405={
+    ids:matched.map(j=>j.id),
+    filter,
+    label:filter==='late'?'Impayés / retard du bilan':filter==='open'?'Reste à encaisser du bilan':filter==='paid'?'Règlements du bilan':'Dossiers du bilan'
+  };
+  accountingFilterV403=filter;
+  if($('accountingStart')){$('accountingStart').value='';$('accountingStart').dataset.ready='1';}
+  if($('accountingEnd'))$('accountingEnd').value='';
+  if($('accountingSearch'))$('accountingSearch').value='';
+  showView('accounting');
+  renderAccounting();
+  setTimeout(()=>$('accountingList')?.scrollIntoView({behavior:'smooth',block:'start'}),80);
+}
+
+function clearAccountingDrilldownV405(){
+  accountingDrilldownV405=null;
+  accountingFilterV403='all';
+  if($('accountingStart'))$('accountingStart').value='';
+  if($('accountingEnd'))$('accountingEnd').value='';
+  if($('accountingSearch'))$('accountingSearch').value='';
+  renderAccounting();
+}
+
+const renderAccountingV405Base=renderAccounting;
+renderAccounting=function(){
+  const result=renderAccountingV405Base();
+  if(accountingDrilldownV405&&$('accountingSummary')){
+    const base=accountingBaseRowsV403();
+    const amount=base.reduce((s,j)=>s+accountingAmountV403(j),0);
+    $('accountingSummary').insertAdjacentHTML('afterbegin',`<div class="alertRed" style="margin-bottom:12px"><b>${esc(accountingDrilldownV405.label)}</b><br>${base.length} dossier(s) · ${euro(amount)} TTC <button style="margin-left:10px" onclick="clearAccountingDrilldownV405()">Afficher toute la comptabilité</button></div>`);
+  }
+  return result;
+};
+
+openAccountingFromBalanceV404=openAccountingFromBalanceV405;
+
+const renderStatsV405Base=renderStats;
+renderStats=function(){
+  const result=renderStatsV405Base();
+  document.querySelectorAll('[onclick*="openAccountingFromBalanceV404"]').forEach(el=>{
+    const onclick=el.getAttribute('onclick')||'';
+    el.setAttribute('onclick',onclick.replace(/openAccountingFromBalanceV404/g,'openAccountingFromBalanceV405'));
+  });
+  return result;
+};
+
+function updateV405Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.5');
+  document.title='Suivi Parage v4.0.5';
+}
+const enterApplicationV405Base=enterApplication;
+enterApplication=async function(){
+  const r=await enterApplicationV405Base();
+  try{await importHistoricalDataV402(false);}catch(e){}
+  updateV405Identity();
+  renderAccounting();
+  return r;
+};
+setTimeout(async()=>{try{await importHistoricalDataV402(false);}catch(e){}updateV405Identity();renderAccounting();},3000);

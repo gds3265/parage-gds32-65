@@ -1,7 +1,7 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#b83278"><link rel="manifest" href="manifest.json?v=4.0.2"><link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=4.0.2"><link rel="icon" type="image/png" href="favicon.png?v=4.0.2"><link rel="stylesheet" href="style.css?v=4.0.2"><title>Suivi Parage</title></head><body>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#b83278"><link rel="manifest" href="manifest.json?v=4.0.5"><link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=4.0.5"><link rel="icon" type="image/png" href="favicon.png?v=4.0.5"><link rel="stylesheet" href="style.css?v=4.0.5"><title>Suivi Parage</title></head><body>
 <div id="loginScreen" class="loginScreen">
   <div class="loginCard">
-    <img src="app-logo.png?v=4.0.2" alt="Suivi Parage">
+    <img src="app-logo.png?v=4.0.5" alt="Suivi Parage">
     <h1>Suivi Parage</h1>
     <p>Connexion sécurisée</p>
     <div id="cloudConfigBox" class="cloudConfigBox" hidden>
@@ -17,7 +17,7 @@
   </div>
 </div>
 <header class="compactHeader">
-  <img class="appLogo" src="app-logo.png?v=4.0.2" alt="Suivi Parage">
+  <img class="appLogo" src="app-logo.png?v=4.0.5" alt="Suivi Parage">
   <div class="headerTitle"><h1>Suivi Parage</h1><small>Chantiers, historique, pro forma et comptabilité</small></div>
   <div class="modeSwitch" id="modeSwitch" hidden>
     <button id="terrainModeBtn" type="button" onclick="setUIMode('terrain')">Terrain</button>
@@ -116,4 +116,4 @@
 <section id="users" class="view"><div class="toolbar"><h2>Utilisateurs</h2><button onclick="refreshUsers()">Actualiser</button></div><div class="panel"><p>Les comptes sont créés dans Supabase Authentication. Ici, l’administratrice attribue ensuite le rôle correspondant.</p><div id="usersList"></div></div></section>
 <section id="journal" class="view"><div class="toolbar"><h2>Journal d’activité</h2><input id="journalSearch" placeholder="Utilisateur, élevage, action…" oninput="renderAuditLog()"><button onclick="exportAuditLog()">Exporter CSV</button></div><div class="panel grid3"><label>Date de début<input id="journalStart" type="date" onchange="renderAuditLog()"></label><label>Date de fin<input id="journalEnd" type="date" onchange="renderAuditLog()"></label><label>Type d’action<select id="journalType" onchange="renderAuditLog()"><option value="">Toutes</option><option>Chantier</option><option>Comptabilité</option><option>Adresse</option><option>Paramètres</option><option>Synchronisation</option></select></label></div><div id="journalList"></div></section>
 <section id="settings" class="view"><h2>Paramètres</h2><div class="panel grid2"><label>TVA (%)<input id="vat" type="number" step="0.01"></label><label>Forfait par défaut (€ HT)<input id="defaultFee" type="number" step="0.01"></label><label>Paire de pieds, 1 bovin (€ HT)<input id="pairOne" type="number" step="0.01"></label><label>Paire de pieds, ≥2 bovins (€ HT)<input id="pairMany" type="number" step="0.01"></label><label>Pied à l'unité, 1 bovin (€ HT)<input id="footOne" type="number" step="0.01"></label><label>Pied à l'unité, ≥2 bovins (€ HT)<input id="footMany" type="number" step="0.01"></label><label>Pansement (€ HT)<input id="bandagePrice" type="number" step="0.01"></label><label>Talonnette (€ HT)<input id="blockPrice" type="number" step="0.01"></label><label>Nom / entreprise<input id="businessName"></label><label>Coordonnées<textarea id="businessDetails"></textarea></label><label>Email comptabilité<input id="accountingEmail" type="email" placeholder="comptabilite@exemple.fr"></label><label>URL Supabase (sauvegarde en ligne)<input id="supabaseUrl" placeholder="https://xxxx.supabase.co"></label><label>Clé publique Supabase<input id="supabaseKey" type="password" placeholder="anon public key"></label><label>Point de départ des tournées<input id="defaultRouteStart" value="Pontis-de-Rivière (31)"></label><label>Coût kilométrique par défaut (€ / km)<input id="defaultKmRate" type="number" step="0.01" value="0.65"></label></div><button class="primary" onclick="saveSettings()">Enregistrer les paramètres</button><div class="panel"><h3>Sauvegarde</h3><button onclick="backupData()">Exporter une sauvegarde</button><button onclick="cloudBackup(true)">Synchroniser maintenant</button><button onclick="cloudRestore()">Restaurer depuis la sauvegarde en ligne</button><label class="fileBtn">Importer une sauvegarde<input type="file" accept="application/json" onchange="restoreData(event)"></label></div></section>
-</main><div id="toast"></div><script src="app.js?v=4.0.1"></script></body></html>
+</main><div id="toast"></div><script src="app.js?v=4.0.5"></script></body></html>
