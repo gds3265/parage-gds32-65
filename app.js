@@ -2083,3 +2083,142 @@ function updateV4Identity(){
 }
 updateV4Identity();
 setTimeout(updateV4Identity,500);
+
+/* =====================================================================
+   V4.0.2 — Import historique 2025–2026 avec montants verrouillés
+   ===================================================================== */
+const APP_VERSION_V402='4.0.2';
+
+const calcV402Base=calc;
+calc=function(job=current){
+  if(job?.importedHistory&&job.historicalSummary){
+    const h=job.historicalSummary;
+    return {
+      n:+h.n||0,pairs:+h.pairs||0,single:+h.single||0,band:+h.band||0,blocks:+h.blocks||0,
+      careTotal:+h.careTotal||0,ht:+h.ht||0,ttc:+h.ttc||0,
+      pairRate:0,footRate:0,bandageRate:0,blockRate:0,historical:true
+    };
+  }
+  return calcV402Base(job);
+};
+
+function historicalImportKeyV402(j){
+  return j.historicalFingerprint||`${j.date||''}|${j.cheptel||''}|${Number(j.historicalSummary?.ht||calc(j).ht||0).toFixed(2)}|${Number(j.historicalSummary?.n||calc(j).n||0)}`;
+}
+
+async function importHistoricalDataV402(force=false){
+  try{
+    const response=await fetch('historical_jobs_2025_2026.json?v=4.0.2',{cache:'no-store'});
+    if(!response.ok)throw new Error('Fichier historique indisponible');
+    const payload=await response.json(),incoming=Array.isArray(payload)?payload:(payload.jobs||[]);
+    const existingIds=new Set(jobs.map(j=>j.id));
+    const existingKeys=new Set(jobs.map(historicalImportKeyV402));
+    let added=0,duplicates=0;
+    for(const raw of incoming){
+      const j=JSON.parse(JSON.stringify(raw));
+      const key=historicalImportKeyV402(j);
+      if(existingIds.has(j.id)||existingKeys.has(key)){duplicates++;continue;}
+      jobs.push(j);existingIds.add(j.id);existingKeys.add(key);added++;
+      if(j.cheptel&&!clients.some(c=>String(c.cheptel)===String(j.cheptel))){
+        const c={cheptel:j.cheptel,nom:j.clientName||'',adresse:j.address||'',cpVille:j.cpVille||'',departement:j.department||''};
+        importedClients.push(c);clients.push(c);
+      }
+    }
+    if(added||force){
+      importedClients=mergeClientBases([],importedClients);
+      localStorage.setItem('parage.importedClients',JSON.stringify(importedClients));
+      localStorage.setItem('parage.historicalImportV402',JSON.stringify({at:new Date().toISOString(),added,duplicates,total:incoming.length}));
+      saveAll();renderHome();renderHistory();renderAccounting();
+      if(typeof sharedCloudBackup==='function')sharedCloudBackup(false).catch(()=>{});
+      logActionV4?.('Synchronisation','Historique 2025–2026 intégré',null,`${added} ajouté(s), ${duplicates} doublon(s)`);
+    }
+    renderHistoricalImportStatusV402();
+    if(force)toast(`${added} chantier(s) historique(s) ajouté(s), ${duplicates} doublon(s) ignoré(s)`);
+    return {added,duplicates,total:incoming.length};
+  }catch(e){
+    console.error(e);renderHistoricalImportStatusV402(String(e.message||e));
+    if(force)toast('Import historique impossible');
+    return null;
+  }
+}
+
+function renderHistoricalImportStatusV402(error=''){
+  const el=$('historicalImportStatus');if(!el)return;
+  const imported=jobs.filter(j=>j.importedHistory),years={};
+  imported.forEach(j=>{const y=(j.date||'').slice(0,4)||'Sans date';years[y]=(years[y]||0)+1;});
+  const last=JSON.parse(localStorage.getItem('parage.historicalImportV402')||'null');
+  el.innerHTML=error
+    ? `<div class="alertRed"><b>Import historique :</b> ${esc(error)}</div>`
+    : `<b>${imported.length} chantier(s) historique(s) intégrés</b><br><small>${Object.entries(years).sort().map(([y,n])=>`${y} : ${n}`).join(' · ')||'Aucune donnée'}${last?.at?` · Dernier contrôle ${new Date(last.at).toLocaleString('fr-FR')}`:''}</small><p class="hint">Les montants HT/TTC d'origine sont verrouillés et ne sont jamais recalculés avec les tarifs actuels. Les anciens fichiers ne contiennent pas les numéros individuels ni les lésions par bovin.</p>`;
+}
+
+function installHistoricalPanelV402(){
+  const section=$('settings');if(!section||$('historicalImportPanel'))return;
+  const panel=document.createElement('div');panel.id='historicalImportPanel';panel.className='panel';
+  panel.innerHTML=`<h3>Historique 2025–2026</h3><div id="historicalImportStatus"></div><button type="button" onclick="importHistoricalDataV402(true)">Contrôler / réintégrer l'historique</button>`;
+  section.appendChild(panel);renderHistoricalImportStatusV402();
+}
+
+function openHistoricalSummaryV402(id){
+  const j=jobs.find(x=>x.id===id);if(!j)return;
+  const c=calc(j),overlay=document.createElement('div');overlay.className='detailBox';overlay.style.cssText='position:fixed;inset:5%;z-index:30;overflow:auto;box-shadow:0 0 0 9999px #000a';
+  overlay.innerHTML=`<div class="toolbar"><h3>Chantier historique — ${fmtDate(j.date)}</h3><button id="closeHistoricalV402">Fermer</button></div><div class="panel grid2"><div><b>${esc(j.clientName||'')}</b><br>${esc(j.cheptel||'')}<br>${esc(j.address||'')}<br>${esc(j.cpVille||'')}</div><div><b>Origine :</b> ${esc(j.origin||'Historique importé')}<br><b>Race :</b> ${esc(j.race||'Non renseignée')}<br><b>Département :</b> ${esc(j.department||'')}</div></div><table><tr><th>Animaux</th><th>Paires</th><th>Pieds seuls</th><th>Pansements</th><th>Talonnettes</th><th>HT</th><th>TTC</th></tr><tr><td>${c.n}</td><td>${c.pairs}</td><td>${c.single}</td><td>${c.band}</td><td>${c.blocks}</td><td>${euro(c.ht)}</td><td>${euro(c.ttc)}</td></tr></table><p><b>Facturé le :</b> ${fmtDate(j.invoiceAt||'')} · <b>Réglé le :</b> ${fmtDate(j.paidAt||'')} · <b>Mode :</b> ${esc(j.paymentMethod||'')}</p>${j.comment?`<p><b>Commentaire :</b> ${esc(j.comment)}</p>`:''}<div class="historyAlert"><b>Détail individuel non disponible :</b> le fichier historique ne comportait pas les numéros de travail, pieds par bovin ni lésions.</div>`;
+  document.body.appendChild(overlay);overlay.querySelector('#closeHistoricalV402').onclick=()=>overlay.remove();
+}
+
+const historyActionsV402Base=historyActionsV331;
+historyActionsV331=function(j){
+  if(j.importedHistory)return `<details class="jobMenu"><summary>⋮</summary><div class="jobMenuPanel"><button onclick="openHistoricalSummaryV402('${j.id}')">Voir le résumé</button>${isAdmin()?`<button class="danger" onclick="moveJobToTrashV331('${j.id}')">Mettre à la corbeille</button>`:''}</div></details>`;
+  return historyActionsV402Base(j);
+};
+const historyStatusV402Base=historyStatusV331;
+historyStatusV331=function(j){if(j.importedHistory)return ['sent','Historique importé'];return historyStatusV402Base(j);};
+
+const openJobV402Base=openJob;
+openJob=function(id){const j=jobs.find(x=>x.id===id);if(j?.importedHistory){openHistoricalSummaryV402(id);return;}return openJobV402Base(id);};
+
+renderStats=function(){
+  initBalanceFilters();
+  const {selected}=filteredBalanceData();
+  const tech={animals:0,feet:0,band:0,blocks:0,review:0,issues:{},departments:{},races:{},categories:{},affectedFeet:{},clawSides:{},farms:new Set()};
+  let ht=0,ttc=0,invoiced=0,paid=0,pending=0;
+  for(const {job,animals} of selected){
+    const c=calc(job);
+    tech.farms.add(job.cheptel||job.clientName);tech.departments[job.department||'Non renseigné']=(tech.departments[job.department||'Non renseigné']||0)+1;
+    if(job.importedHistory){
+      tech.animals+=c.n;tech.feet+=c.pairs*2+c.single;tech.band+=c.band;tech.blocks+=c.blocks;
+      tech.races[job.race||'Non renseignée']=(tech.races[job.race||'Non renseignée']||0)+c.n;
+      tech.categories['Non disponible (historique)']=(tech.categories['Non disponible (historique)']||0)+c.n;
+    }else{
+      tech.races[job.race||'Non renseignée']=(tech.races[job.race||'Non renseignée']||0)+animals.length;
+      for(const a of animals){tech.categories[categoryLabels[a.category]||a.category||'Non renseignée']=(tech.categories[categoryLabels[a.category]||a.category||'Non renseignée']||0)+1;countAnimalTechnical(a,tech);}
+    }
+    ht+=c.ht;ttc+=c.ttc;
+    if(job.paymentStatus==='paid'||job.paidAt)paid+=c.ttc;else pending+=c.ttc;
+    if(job.invoiceNo||job.invoiceAt||['invoiced','paid','late'].includes(job.paymentStatus))invoiced+=c.ttc;
+  }
+  if($('technicalCards'))$('technicalCards').innerHTML=card('Chantiers',selected.length)+card('Exploitations',tech.farms.size)+card('Bovins',tech.animals)+card('Pieds réalisés',tech.feet)+card('Pansements',tech.band)+card('Talonnettes',tech.blocks)+card('À contrôler',tech.review)+card('Problèmes relevés',Object.values(tech.issues).reduce((a,b)=>a+b,0));
+  if($('technicalTables'))$('technicalTables').innerHTML=`<div class="balanceGrid"><div class="panel"><h3>Problèmes rencontrés</h3>${objTable(tech.issues,'Problème','Nombre')}</div><div class="panel"><h3>Par catégorie</h3>${objTable(tech.categories,'Catégorie','Bovins')}</div><div class="panel"><h3>Par race</h3>${objTable(tech.races,'Race','Bovins')}</div><div class="panel"><h3>Par département</h3>${objTable(tech.departments,'Département','Chantiers')}</div><div class="panel"><h3>Pieds atteints</h3>${objTable(Object.fromEntries(Object.entries(tech.affectedFeet).map(([k,v])=>[Object.fromEntries(feet)[k]||k,v])),'Pied','Lésions')}</div><div class="panel"><h3>Onglons atteints</h3>${objTable({'Interne':tech.clawSides.Int||0,'Externe':tech.clawSides.Ext||0},'Onglon','Lésions')}</div></div>`;
+  const co=currentBalanceCosts();
+  if($('routeStart')&&document.activeElement!==$('routeStart'))$('routeStart').value=co.routeStart||settings.defaultRouteStart||'Pontis-de-Rivière (31)';
+  if($('routeKm')&&document.activeElement!==$('routeKm'))$('routeKm').value=co.km||'';
+  if($('routeKmRate')&&document.activeElement!==$('routeKmRate'))$('routeKmRate').value=co.kmRate??settings.defaultKmRate??0.65;
+  [['costFuel','fuel'],['costToll','toll'],['costMaterial','material'],['costMeals','meals'],['costOther','other'],['costComment','comment']].forEach(([id,key])=>{if($(id)&&document.activeElement!==$(id))$(id).value=co[key]||'';});
+  if($('routeReturnHome')){$('routeReturnHome').checked=true;$('routeReturnHome').disabled=true;}
+  const km=+$('routeKm')?.value||+co.km||0,kmRate=+$('routeKmRate')?.value||+co.kmRate||+settings.defaultKmRate||0;
+  const roadCost=km*kmRate,otherCosts=['costFuel','costToll','costMaterial','costMeals','costOther'].reduce((sum,id)=>sum+(+$(id)?.value||0),0),totalCosts=roadCost+otherCosts,result=ht-totalCosts;
+  const avgAnimal=tech.animals?ht/tech.animals:0,avgJob=selected.length?ht/selected.length:0;
+  if($('economicCards'))$('economicCards').innerHTML=card('CA HT',euro(ht))+card('CA TTC',euro(ttc))+card('Facturé TTC',euro(invoiced))+card('Encaissé',euro(paid))+card('Reste à encaisser',euro(pending))+card('Kilomètres',km.toLocaleString('fr-FR'))+card('Coût tournée',euro(roadCost))+card('Résultat simplifié',euro(result));
+  if($('economicTables'))$('economicTables').innerHTML=`<div class="balanceGrid"><div class="panel"><h3>Rentabilité</h3><table><tr><th>Indicateur</th><th>Valeur</th></tr><tr><td>Prix moyen par chantier</td><td>${euro(avgJob)}</td></tr><tr><td>Prix moyen par bovin</td><td>${euro(avgAnimal)}</td></tr><tr><td>Coût total saisi</td><td>${euro(totalCosts)}</td></tr><tr><td>Résultat simplifié HT</td><td>${euro(result)}</td></tr><tr><td>CA HT / km</td><td>${euro(km?ht/km:0)}</td></tr></table></div><div class="panel"><h3>Suivi comptable</h3><table><tr><th>État</th><th>Montant TTC</th></tr><tr><td>Facturé</td><td>${euro(invoiced)}</td></tr><tr><td>Réglé</td><td>${euro(paid)}</td></tr><tr><td>En attente</td><td>${euro(pending)}</td></tr></table></div></div>`;
+};
+
+exportFilteredBalance=function(){
+  const {filters,selected}=filteredBalanceData();const rows=[['Date','Cheptel','Élevage','Département','Race','N° bovin','Catégorie','Pieds','Problèmes','Soins','HT chantier','TTC chantier','Origine']];
+  for(const {job,animals} of selected){const c=calc(job);if(job.importedHistory){rows.push([job.date,job.cheptel,job.clientName,job.department,job.race,'Non disponible','Non disponible',c.pairs*2+c.single,'Non disponible',`Pansements: ${c.band} / Talonnettes: ${c.blocks}`,c.ht,c.ttc,job.origin]);continue;}for(const a of animals){ensureWorkedFeet(a);const probs=[],soins=[];for(const [k,d] of Object.entries(a.claws||{})){for(const x of d.issues||[])probs.push(`${k}: ${x}`);for(const x of d.care||[])soins.push(`${k}: ${x}`);}rows.push([job.date,job.cheptel,job.clientName,job.department,job.race,a.number,categoryLabels[a.category]||a.category,(a.workedFeet||[]).map(x=>Object.fromEntries(feet)[x]||x).join(' | '),probs.join(' | '),soins.join(' | '),c.ht,c.ttc,'Application']);}}
+  const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n');download(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),`Bilan_${activeBalanceTab}_${filters.start||'debut'}_${filters.end||'fin'}.csv`);toast('Bilan filtré exporté');
+};
+
+function updateV402Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.2');document.title='Suivi Parage v4.0.2';installHistoricalPanelV402();renderHistoricalImportStatusV402();}
+const enterApplicationV402Base=enterApplication;
+enterApplication=async function(){const r=await enterApplicationV402Base();await importHistoricalDataV402(false);updateV402Identity();return r;};
+setTimeout(async()=>{installHistoricalPanelV402();await importHistoricalDataV402(false);updateV402Identity();},1800);
