@@ -2641,3 +2641,89 @@ setAccountingFilterV403=function(filter){
 clearAccountingSnapshotV406=function(){
   resetAccountingFiltersV406();
 };
+
+
+/* =====================================================================
+   V4.0.8 — panneau comptable unique, filtres réellement réinitialisables
+   ===================================================================== */
+const APP_VERSION_V408='4.0.8';
+
+function accountingDetailHostV408(){
+  return $('accountingDetailHost');
+}
+function clearAccountingDetailsV408(){
+  accountingSnapshotV406=null;
+  accountingDrilldownV405=null;
+  const host=accountingDetailHostV408();
+  if(host) host.innerHTML='';
+}
+function renderAccountingSnapshotV408(){
+  const host=accountingDetailHostV408();
+  if(!host)return;
+  /* Affectation complète : jamais d'empilement, même après plusieurs clics. */
+  host.innerHTML='';
+  if(!accountingSnapshotV406)return;
+  const rows=resolveSnapshotRowsV406(accountingSnapshotV406)
+    .sort((a,b)=>(a.invoiceAt||a.date||'').localeCompare(b.invoiceAt||b.date||''));
+  const total=rows.reduce((sum,j)=>sum+accountingAmountV403(j),0);
+  const body=rows.map(j=>{
+    const st=snapshotStatusV406(j),c=calc(j);
+    return `<tr class="${st[0]==='late'?'lateRow':''}"><td>${fmtDate(j.date)}</td><td><b>${esc(j.clientName||'')}</b><br><small>${esc(j.cpVille||'')}</small></td><td>${esc(j.cheptel||'')}</td><td>${j.invoiceNo?esc(j.invoiceNo):'—'}</td><td>${fmtDate(j.invoiceAt||'')}</td><td><b>${euro(c.ttc)}</b></td><td><span class="status ${st[0]}">${st[1]}</span></td><td><button onclick="${j.importedHistory?`openHistoricalSummaryV402('${j.id}')`:`openStoredProformaForJob('${j.id}')`}">Voir le dossier</button></td></tr>`;
+  }).join('');
+  host.innerHTML=`<div class="panel accountingSnapshotV406"><div class="toolbar"><div><h3>${esc(accountingSnapshotV406.label)}</h3><p><b>${rows.length} dossier(s) · ${euro(total)} TTC</b></p></div><button type="button" onclick="clearAccountingSnapshotV408()">Fermer ce détail</button></div><div class="tableScroll"><table><tr><th>Chantier</th><th>Éleveur</th><th>Cheptel</th><th>Facture</th><th>Facturé le</th><th>Montant</th><th>État</th><th></th></tr>${body||'<tr><td colspan="8"><b>Aucun dossier retrouvé.</b></td></tr>'}</table></div></div>`;
+}
+function clearAccountingSnapshotV408(){
+  clearAccountingDetailsV408();
+  accountingFilterV403='all';
+  renderAccounting();
+}
+function resetAccountingFiltersV408(){
+  clearAccountingDetailsV408();
+  accountingFilterV403='all';
+  if($('accountingStart')){$('accountingStart').value='';$('accountingStart').dataset.ready='1';}
+  if($('accountingEnd'))$('accountingEnd').value='';
+  if($('accountingSearch'))$('accountingSearch').value='';
+  renderAccounting();
+  setTimeout(()=>$('accounting')?.scrollIntoView({behavior:'smooth',block:'start'}),30);
+}
+function handleAccountingCriteriaChangeV408(){
+  clearAccountingDetailsV408();
+  renderAccounting();
+}
+
+/* Remplace définitivement les anciens gestionnaires susceptibles d'empiler les blocs. */
+resetAccountingFiltersV406=resetAccountingFiltersV408;
+handleAccountingCriteriaChangeV406=handleAccountingCriteriaChangeV408;
+clearAccountingSnapshotV406=clearAccountingSnapshotV408;
+
+const setAccountingFilterV408Base=setAccountingFilterV403;
+setAccountingFilterV403=function(filter){
+  clearAccountingDetailsV408();
+  accountingFilterV403=filter||'all';
+  /* Appel direct du moteur d'origine, sans réutiliser le drilldown du bilan. */
+  return setAccountingFilterV405Original(filter||'all');
+};
+
+const renderAccountingV408Base=renderAccounting;
+renderAccounting=function(){
+  /* Neutralise tout ancien bloc injecté dans le résumé avant le rendu. */
+  document.querySelectorAll('.accountingSnapshotV406').forEach(el=>el.remove());
+  const r=renderAccountingV408Base();
+  document.querySelectorAll('#accountingSummary .accountingSnapshotV406').forEach(el=>el.remove());
+  renderAccountingSnapshotV408();
+  return r;
+};
+
+function updateV408Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.8');
+  document.title='Suivi Parage v4.0.8';
+}
+const enterApplicationV408Base=enterApplication;
+enterApplication=async function(){
+  const r=await enterApplicationV408Base();
+  updateV408Identity();
+  clearAccountingDetailsV408();
+  renderAccounting();
+  return r;
+};
+setTimeout(()=>{updateV408Identity();clearAccountingDetailsV408();renderAccounting();},3800);
