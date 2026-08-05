@@ -2727,3 +2727,73 @@ enterApplication=async function(){
   return r;
 };
 setTimeout(()=>{updateV408Identity();clearAccountingDetailsV408();renderAccounting();},3800);
+
+/* =====================================================================
+   V4.0.9 — comptabilité complète incluant systématiquement l'historique
+   ===================================================================== */
+const APP_VERSION_V409='4.0.9';
+let accountingHistoryLoadV409=null;
+
+function validAccountingJobV409(j){
+  return !!j && !j.trashedAt && !j.cancelledAt && (j.status==='finished' || j.importedHistory===true);
+}
+function accountingBaseRowsV409(){
+  const start=$('accountingStart')?.value||'';
+  const end=$('accountingEnd')?.value||'';
+  const q=($('accountingSearch')?.value||'').trim().toLowerCase();
+  return jobs.filter(j=>{
+    if(!validAccountingJobV409(j))return false;
+    const d=String(j.date||'').slice(0,10);
+    if(start&&d<start)return false;
+    if(end&&d>end)return false;
+    if(q&&!`${j.clientName||''} ${j.cheptel||''} ${j.invoiceNo||''} ${j.cpVille||''} ${j.address||''}`.toLowerCase().includes(q))return false;
+    return true;
+  }).sort((a,b)=>`${b.date||''} ${b.start||''}`.localeCompare(`${a.date||''} ${a.start||''}`));
+}
+accountingBaseRowsV403=accountingBaseRowsV409;
+
+async function ensureAccountingHistoryV409(){
+  if(accountingHistoryLoadV409)return accountingHistoryLoadV409;
+  accountingHistoryLoadV409=(async()=>{
+    try{
+      await importHistoricalDataV402(false);
+    }catch(e){console.error('Historique comptable',e);}
+    return true;
+  })();
+  try{return await accountingHistoryLoadV409;}finally{accountingHistoryLoadV409=null;}
+}
+
+const showViewV409Base=showView;
+showView=function(viewId){
+  const r=showViewV409Base(viewId);
+  if(viewId==='accounting'){
+    ensureAccountingHistoryV409().then(()=>renderAccounting());
+  }
+  return r;
+};
+document.querySelectorAll('#nav button').forEach(btn=>btn.onclick=()=>showView(btn.dataset.view));
+
+const renderAccountingV409Base=renderAccounting;
+renderAccounting=function(){
+  const r=renderAccountingV409Base();
+  /* Si l'historique n'est pas encore présent au premier affichage, le recharge
+     puis relance automatiquement la vue sans intervention de l'utilisateur. */
+  if(!jobs.some(j=>j?.importedHistory)&&!accountingHistoryLoadV409){
+    ensureAccountingHistoryV409().then(()=>renderAccounting());
+  }
+  return r;
+};
+
+function updateV409Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.9');
+  document.title='Suivi Parage v4.0.9';
+}
+const enterApplicationV409Base=enterApplication;
+enterApplication=async function(){
+  const r=await enterApplicationV409Base();
+  await ensureAccountingHistoryV409();
+  updateV409Identity();
+  renderAccounting();
+  return r;
+};
+setTimeout(async()=>{await ensureAccountingHistoryV409();updateV409Identity();renderAccounting();},4200);
