@@ -2222,3 +2222,84 @@ function updateV402Identity(){document.querySelectorAll('.versionBadge').forEach
 const enterApplicationV402Base=enterApplication;
 enterApplication=async function(){const r=await enterApplicationV402Base();await importHistoricalDataV402(false);updateV402Identity();return r;};
 setTimeout(async()=>{installHistoricalPanelV402();await importHistoricalDataV402(false);updateV402Identity();},1800);
+
+/* =====================================================================
+   V4.0.3 — Tableau de bord comptable global et résumé exploitation
+   ===================================================================== */
+const APP_VERSION_V403='4.0.3';
+let accountingFilterV403='all';
+
+function isPaidV403(j){return j.paymentStatus==='paid'||!!j.paidAt;}
+function isLateV403(j){return j.paymentStatus==='late';}
+function isInvoicedV403(j){return !!(j.invoiceNo||j.invoiceAt||['invoiced','partial','paid','late'].includes(j.paymentStatus));}
+function isOpenV403(j){return isInvoicedV403(j)&&!isPaidV403(j);}
+function isToInvoiceV403(j){return !isInvoicedV403(j)&&j.status==='finished';}
+function accountingAmountV403(j){return calc(j).ttc||0;}
+function accountingJobStatusV403(j){
+  if(isLateV403(j))return ['late','Impayée / retard'];
+  if(isPaidV403(j))return ['paid','Réglée'];
+  if(isInvoicedV403(j))return ['invoiced',j.paymentStatus==='partial'?'Partiellement réglée':'Facturée / attente'];
+  if(j.accountingSentAt||j.exportedAt)return ['sent','Pro forma transmise'];
+  return ['pending','À facturer'];
+}
+function accountingBaseRowsV403(){
+  const start=$('accountingStart')?.value||'',end=$('accountingEnd')?.value||'',q=($('accountingSearch')?.value||'').trim().toLowerCase();
+  return jobs.filter(j=>j.status==='finished'&&!j.trashedAt&&!j.cancelledAt&&(!start||j.date>=start)&&(!end||j.date<=end)&&(!q||`${j.clientName||''} ${j.cheptel||''} ${j.invoiceNo||''} ${j.cpVille||''}`.toLowerCase().includes(q))).sort((a,b)=>`${b.date||''} ${b.start||''}`.localeCompare(`${a.date||''} ${a.start||''}`));
+}
+function accountingFilteredRowsV403(){
+  return accountingBaseRowsV403().filter(j=>accountingFilterV403==='all'||(accountingFilterV403==='to_invoice'&&isToInvoiceV403(j))||(accountingFilterV403==='open'&&isOpenV403(j))||(accountingFilterV403==='late'&&isLateV403(j))||(accountingFilterV403==='paid'&&isPaidV403(j)));
+}
+function setAccountingFilterV403(filter){accountingFilterV403=filter;renderAccounting();setTimeout(()=>$('accountingList')?.scrollIntoView({behavior:'smooth',block:'start'}),40);}
+function accountingCardV403(title,count,amount,filter,note=''){
+  const active=accountingFilterV403===filter?' active':'';
+  return `<button class="card clickableCard${active}" onclick="setAccountingFilterV403('${filter}')"><span>${title}</span><b>${count}</b><strong>${euro(amount)}</strong>${note?`<small>${esc(note)}</small>`:''}</button>`;
+}
+function daysSinceV403(date){if(!date)return'';const d=Math.max(0,Math.floor((new Date(today())-new Date(date))/(86400000)));return d;}
+function renderAccounting(){
+  if($('accountingStart')&&!$('accountingStart').dataset.ready){$('accountingStart').value='';$('accountingEnd').value='';$('accountingStart').dataset.ready='1';}
+  const base=accountingBaseRowsV403(),arr=accountingFilteredRowsV403();
+  const toInvoice=base.filter(isToInvoiceV403),invoiced=base.filter(isInvoicedV403),open=base.filter(isOpenV403),late=base.filter(isLateV403),paid=base.filter(isPaidV403);
+  const sum=a=>a.reduce((s,j)=>s+accountingAmountV403(j),0);
+  if($('accountingCards'))$('accountingCards').innerHTML=
+    accountingCardV403('Tous les dossiers',base.length,sum(base),'all')+
+    accountingCardV403('À facturer',toInvoice.length,sum(toInvoice),'to_invoice')+
+    accountingCardV403('À encaisser',open.length,sum(open),'open')+
+    accountingCardV403('Impayés / retard',late.length,sum(late),'late')+
+    accountingCardV403('Réglés',paid.length,sum(paid),'paid');
+  document.querySelectorAll('[data-accounting-filter]').forEach(b=>b.classList.toggle('active',b.dataset.accountingFilter===accountingFilterV403));
+  const totalHT=base.reduce((s,j)=>s+(calc(j).ht||0),0),totalTTC=sum(base),encaisse=sum(paid),reste=sum(open),facture=sum(invoiced);
+  if($('accountingSummary'))$('accountingSummary').innerHTML=`<h3>Vision comptable complète</h3><div class="accountingSummaryGrid"><div>CA HT total<b>${euro(totalHT)}</b></div><div>CA TTC total<b>${euro(totalTTC)}</b></div><div>Facturé TTC<b>${euro(facture)}</b></div><div>Encaissé<b>${euro(encaisse)}</b></div><div>Reste à encaisser<b><button class="amountLink" onclick="setAccountingFilterV403('open')">${euro(reste)}</button></b></div><div>Dossiers à facturer<b>${toInvoice.length}</b></div><div>Factures ouvertes<b>${open.length}</b></div><div>Impayés signalés<b>${late.length}</b></div></div><p class="hint">Touchez une tuile ou le montant restant à encaisser pour afficher immédiatement les dossiers correspondants.</p>`;
+  if(!$('accountingList'))return;
+  $('accountingList').innerHTML=arr.map(j=>{
+    const c=calc(j),st=accountingJobStatusV403(j),days=daysSinceV403(j.invoiceAt||j.date),isHist=j.importedHistory;
+    return `<div class="row accountingRow ${st[0]==='late'?'highlightLate':isOpenV403(j)?'highlightOpen':''}">
+      <input type="checkbox" class="accountingCheck" value="${j.id}" ${isToInvoiceV403(j)?'checked':''}>
+      <div class="grow"><b>${fmtDate(j.date)} — ${esc(j.clientName||j.cheptel)}</b><br><small>${esc(j.cheptel)} · ${c.n} bovin(s) · <b>${euro(c.ttc)} TTC</b></small><div class="accountingDetailNote">${j.invoiceNo?`Facture ${esc(j.invoiceNo)}`:'Pas encore facturé'}${j.invoiceAt?` · émise le ${fmtDate(j.invoiceAt)}`:''}${isOpenV403(j)&&days!==''?` · ouverte depuis ${days} jour(s)`:''}</div></div>
+      <span class="status ${st[0]}">${st[1]}</span>
+      ${canEditAccounting()?`<label class="compactField">N° facture<input value="${esc(j.invoiceNo||'')}" onchange="updateAccountingJob('${j.id}','invoiceNo',this.value)"></label><label class="compactField">Date facture<input type="date" value="${esc(j.invoiceAt||'')}" onchange="updateAccountingJob('${j.id}','invoiceAt',this.value)"></label><select onchange="setAccountingStatus('${j.id}',this.value)"><option value="pending" ${!isInvoicedV403(j)&&!j.accountingSentAt?'selected':''}>À facturer</option><option value="sent" ${j.paymentStatus==='sent'?'selected':''}>Pro forma transmise</option><option value="invoiced" ${j.paymentStatus==='invoiced'?'selected':''}>Facturée / attente</option><option value="partial" ${j.paymentStatus==='partial'?'selected':''}>Partiellement réglée</option><option value="paid" ${isPaidV403(j)?'selected':''}>Réglée</option><option value="late" ${isLateV403(j)?'selected':''}>Impayée / retard</option></select>`:''}
+      <button onclick="${isHist?`openHistoricalSummaryV402('${j.id}')`:`openStoredProformaForJob('${j.id}')`}">${isHist?'Résumé':'Pro forma'}</button>
+    </div>`;
+  }).join('')||`<div class="panel emptyAccounting"><h3>Aucun dossier</h3><p>Aucun chantier ne correspond à cette période, cette recherche et ce statut.</p></div>`;
+}
+
+const setAccountingStatusV403Base=setAccountingStatus;
+setAccountingStatus=function(id,status){const j=jobs.find(x=>x.id===id);if(!j)return;if(status==='partial'){j.paymentStatus='partial';saveAll();cloudBackup(false);renderAccounting();renderPaymentAlert();return;}return setAccountingStatusV403Base(id,status);};
+const updateAccountingJobV403Base=updateAccountingJob;
+updateAccountingJob=function(id,key,value){const j=jobs.find(x=>x.id===id);if(j&&key==='invoiceAt'&&value&&!j.invoiceNo&&!j.paymentStatus)j.paymentStatus='invoiced';const r=updateAccountingJobV403Base(id,key,value);renderAccounting();return r;};
+
+function renderFarmOverviewV403(){
+  const el=$('farmOverview');if(!el||!current)return;const ch=String(current.cheptel||$('cheptel')?.value||'').replace(/\D/g,'');if(!ch){el.innerHTML='';return;}
+  const previous=jobs.filter(j=>String(j.cheptel||'').replace(/\D/g,'')===ch&&j.id!==current.id&&j.status==='finished'&&!j.cancelledAt&&!j.trashedAt).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const last=previous[0],open=previous.filter(isOpenV403),late=previous.filter(isLateV403),paid=previous.filter(isPaidV403),sum=a=>a.reduce((s,j)=>s+accountingAmountV403(j),0);
+  const accountState=late.length?'<span class="status late">Impayé / retard</span>':open.length?'<span class="status invoiced">Paiement en attente</span>':'<span class="status paid">Compte à jour</span>';
+  el.innerHTML=`<div class="panel farmOverviewPanel"><div class="toolbar"><h3>Historique de l’exploitation</h3>${accountState}</div><div class="farmOverviewGrid"><div>Chantiers déjà réalisés<b>${previous.length}</b></div><div>Dernier passage<b>${last?fmtDate(last.date):'Premier chantier'}</b></div><div>Factures ouvertes<b>${open.length}</b><small>${euro(sum(open))} restant</small></div><div>Impayés signalés<b>${late.length}</b><small>${late.length?euro(sum(late)):'Aucun'}</small></div></div>${last?`<p class="hint">Dernier chantier : ${calc(last).n} bovin(s), ${calc(last).pairs} paire(s), ${calc(last).single} pied(s) seul(s). ${last.importedHistory?'Historique importé.':''}</p>`:'<p class="hint">Aucun chantier antérieur trouvé pour ce numéro de cheptel.</p>'}</div>`;
+}
+const renderPaymentAlertV403Base=renderPaymentAlert;
+renderPaymentAlert=function(){const r=renderPaymentAlertV403Base();renderFarmOverviewV403();return r;};
+const fillJobV403Base=fillJob;
+fillJob=function(){const r=fillJobV403Base();renderFarmOverviewV403();return r;};
+
+function updateV403Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.3');document.title='Suivi Parage v4.0.3';}
+const enterApplicationV403Base=enterApplication;
+enterApplication=async function(){const r=await enterApplicationV403Base();updateV403Identity();renderAccounting();return r;};
+setTimeout(()=>{updateV403Identity();renderAccounting();renderFarmOverviewV403();},2200);
