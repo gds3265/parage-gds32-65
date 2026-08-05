@@ -2797,3 +2797,112 @@ enterApplication=async function(){
   return r;
 };
 setTimeout(async()=>{await ensureAccountingHistoryV409();updateV409Identity();renderAccounting();},4200);
+
+/* =====================================================================
+   V4.0.10 — remplacement définitif du moteur de la vue Comptabilité
+   ===================================================================== */
+const APP_VERSION_V410='4.0.10';
+
+function accountingRowsV410(){
+  const start=$('accountingStart')?.value||'';
+  const end=$('accountingEnd')?.value||'';
+  const q=($('accountingSearch')?.value||'').trim().toLowerCase();
+  return (jobs||[]).filter(j=>{
+    if(!j||j.trashedAt||j.cancelledAt)return false;
+    if(j.status!=='finished'&&j.importedHistory!==true)return false;
+    const d=String(j.date||'').slice(0,10);
+    if(start&&d<start)return false;
+    if(end&&d>end)return false;
+    if(q){
+      const haystack=`${j.clientName||''} ${j.cheptel||''} ${j.invoiceNo||''} ${j.cpVille||''} ${j.address||''}`.toLowerCase();
+      if(!haystack.includes(q))return false;
+    }
+    return true;
+  }).sort((a,b)=>`${b.date||''} ${b.start||''}`.localeCompare(`${a.date||''} ${a.start||''}`));
+}
+
+function accountingMatchesFilterV410(j,filter){
+  if(filter==='to_invoice')return isToInvoiceV403(j);
+  if(filter==='open')return isOpenV404(j);
+  if(filter==='late')return isLateV404(j);
+  if(filter==='paid')return isPaidV403(j);
+  return true;
+}
+
+function renderAccountingV410(){
+  const base=accountingRowsV410();
+  const filter=accountingFilterV403||'all';
+  const arr=base.filter(j=>accountingMatchesFilterV410(j,filter));
+  const toInvoice=base.filter(isToInvoiceV403);
+  const open=base.filter(isOpenV404);
+  const late=base.filter(isLateV404);
+  const paid=base.filter(isPaidV403);
+  const invoiced=base.filter(isInvoicedV403);
+  const sum=a=>a.reduce((s,j)=>s+(Number(calc(j).ttc)||0),0);
+  const totalHT=base.reduce((s,j)=>s+(Number(calc(j).ht)||0),0);
+  const totalAnimals=base.reduce((s,j)=>s+(Number(calc(j).n)||0),0);
+
+  if($('accountingCards')){
+    $('accountingCards').innerHTML=
+      accountingCardV403('Tous les dossiers',base.length,sum(base),'all',`${totalAnimals} bovin(s)`)+
+      accountingCardV403('À facturer',toInvoice.length,sum(toInvoice),'to_invoice')+
+      accountingCardV403('À encaisser',open.length,sum(open),'open')+
+      accountingCardV403('Impayés / retard',late.length,sum(late),'late')+
+      accountingCardV403('Réglés',paid.length,sum(paid),'paid');
+  }
+  document.querySelectorAll('[data-accounting-filter]').forEach(b=>b.classList.toggle('active',b.dataset.accountingFilter===filter));
+
+  if($('accountingSummary')){
+    $('accountingSummary').innerHTML=`<h3>Vision comptable complète</h3><div class="accountingSummaryGrid"><div>Chantiers<b>${base.length}</b></div><div>Bovins<b>${totalAnimals}</b></div><div>CA HT total<b>${euro(totalHT)}</b></div><div>CA TTC total<b>${euro(sum(base))}</b></div><div>Facturé TTC<b>${euro(sum(invoiced))}</b></div><div>Encaissé<b>${euro(sum(paid))}</b></div><div>Reste à encaisser<b><button class="amountLink" onclick="setAccountingFilterV403('open')">${euro(sum(open))}</button></b></div><div>Dossiers à facturer<b>${toInvoice.length}</b></div><div>Impayés / retard<b><button class="amountLink" onclick="setAccountingFilterV403('late')">${late.length} · ${euro(sum(late))}</button></b></div></div><div class="accountingSelectionTotal"><span>Liste affichée : <b>${arr.length} dossier(s)</b></span><strong>${euro(sum(arr))} TTC</strong></div><p class="hint">Les chantiers créés dans l’application et l’historique importé sont comptabilisés ensemble.</p>`;
+  }
+
+  if($('accountingList')){
+    $('accountingList').innerHTML=arr.map(j=>{
+      const c=calc(j),st=accountingJobStatusV404(j),isHist=j.importedHistory===true;
+      return `<div class="row accountingRow ${st[0]==='late'?'highlightLate':isOpenV404(j)?'highlightOpen':''}">
+        <input type="checkbox" class="accountingCheck" value="${j.id}" ${isToInvoiceV403(j)?'checked':''}>
+        <div class="grow"><div class="accountingTitleLine"><b>${fmtDate(j.date)} — ${esc(j.clientName||j.cheptel||'Sans nom')}</b>${isHist?'<span class="historySourceBadge">Historique importé</span>':''}</div><small>${esc(j.cheptel||'')} · ${c.n||0} bovin(s) · <b>${euro(c.ttc||0)} TTC</b>${j.cpVille?` · ${esc(j.cpVille)}`:''}</small><div class="accountingDetailNote">${accountingRowDetailsV404(j)}</div></div>
+        <span class="status ${st[0]}">${st[1]}</span>
+        ${canEditAccounting()?`<label class="compactField">N° facture<input value="${esc(j.invoiceNo||'')}" onchange="updateAccountingJob('${j.id}','invoiceNo',this.value)"></label><label class="compactField">Date facture<input type="date" value="${esc(j.invoiceAt||'')}" onchange="updateAccountingJob('${j.id}','invoiceAt',this.value)"></label><select onchange="setAccountingStatus('${j.id}',this.value)"><option value="pending" ${!isInvoicedV403(j)&&!j.accountingSentAt?'selected':''}>À facturer</option><option value="sent" ${j.paymentStatus==='sent'?'selected':''}>Pro forma transmise</option><option value="invoiced" ${j.paymentStatus==='invoiced'?'selected':''}>Facturée / attente</option><option value="partial" ${j.paymentStatus==='partial'?'selected':''}>Partiellement réglée</option><option value="paid" ${isPaidV403(j)?'selected':''}>Réglée</option><option value="late" ${isLateV404(j)?'selected':''}>Impayée / retard</option></select>`:''}
+        <button onclick="${isHist?`openHistoricalSummaryV402('${j.id}')`:`openStoredProformaForJob('${j.id}')`}">${isHist?'Voir le dossier':'Pro forma'}</button>
+      </div>`;
+    }).join('')||'<div class="panel emptyAccounting"><h3>Aucun dossier</h3><p>Aucun chantier ne correspond aux filtres sélectionnés.</p></div>';
+  }
+
+  renderAccountingSnapshotV408();
+}
+
+/* Affectation directe : aucune ancienne fonction ne peut reprendre la main. */
+renderAccounting=renderAccountingV410;
+
+setAccountingFilterV403=function(filter){
+  clearAccountingDetailsV408();
+  accountingFilterV403=filter||'all';
+  renderAccountingV410();
+};
+
+resetAccountingFiltersV408=function(){
+  clearAccountingDetailsV408();
+  accountingFilterV403='all';
+  if($('accountingStart')){$('accountingStart').value='';$('accountingStart').dataset.ready='1';}
+  if($('accountingEnd'))$('accountingEnd').value='';
+  if($('accountingSearch'))$('accountingSearch').value='';
+  renderAccountingV410();
+};
+resetAccountingFiltersV406=resetAccountingFiltersV408;
+handleAccountingCriteriaChangeV406=function(){clearAccountingDetailsV408();renderAccountingV410();};
+handleAccountingCriteriaChangeV408=handleAccountingCriteriaChangeV406;
+
+function updateV410Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.10');
+  document.title='Suivi Parage v4.0.10';
+}
+const enterApplicationV410Base=enterApplication;
+enterApplication=async function(){
+  const r=await enterApplicationV410Base();
+  await ensureAccountingHistoryV409();
+  updateV410Identity();
+  renderAccountingV410();
+  return r;
+};
+setTimeout(async()=>{await ensureAccountingHistoryV409();updateV410Identity();renderAccountingV410();},4600);
