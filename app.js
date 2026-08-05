@@ -2511,9 +2511,9 @@ enterApplication=async function(){
 setTimeout(async()=>{try{await importHistoricalDataV402(false);}catch(e){}updateV405Identity();renderAccounting();},3000);
 
 /* =====================================================================
-   V4.0.6 — Détail comptable garanti depuis le bilan
+   V4.0.7 — Détail comptable garanti depuis le bilan
    ===================================================================== */
-const APP_VERSION_V406='4.0.6';
+const APP_VERSION_V407='4.0.7';
 let accountingSnapshotV406=null;
 
 function snapshotKeyV406(j){
@@ -2596,8 +2596,8 @@ renderStats=function(){
 };
 
 function updateV406Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.6');
-  document.title='Suivi Parage v4.0.6';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.7');
+  document.title='Suivi Parage v4.0.7';
 }
 const enterApplicationV406Base=enterApplication;
 enterApplication=async function(){
@@ -2608,3 +2608,36 @@ enterApplication=async function(){
   return r;
 };
 setTimeout(async()=>{try{await importHistoricalDataV402(false);}catch(e){}updateV406Identity();renderAccounting();},3400);
+
+
+/* Correctif V4.0.7 — fermeture et réinitialisation des détails comptables */
+function closeAccountingDetailsV406(){
+  accountingSnapshotV406=null;
+  accountingDrilldownV405=null;
+}
+
+function handleAccountingCriteriaChangeV406(){
+  closeAccountingDetailsV406();
+  renderAccounting();
+}
+
+function resetAccountingFiltersV406(){
+  closeAccountingDetailsV406();
+  accountingFilterV403='all';
+  if($('accountingStart')){$('accountingStart').value='';$('accountingStart').dataset.ready='1';}
+  if($('accountingEnd'))$('accountingEnd').value='';
+  if($('accountingSearch'))$('accountingSearch').value='';
+  renderAccounting();
+  setTimeout(()=>$('accountingSummary')?.scrollIntoView({behavior:'smooth',block:'start'}),40);
+}
+
+const setAccountingFilterV406Fixed=setAccountingFilterV403;
+setAccountingFilterV403=function(filter){
+  closeAccountingDetailsV406();
+  accountingFilterV403=filter||'all';
+  return setAccountingFilterV406Fixed(filter||'all');
+};
+
+clearAccountingSnapshotV406=function(){
+  resetAccountingFiltersV406();
+};

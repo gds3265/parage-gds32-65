@@ -9,3 +9,6 @@ Correction principale :
 - Le bouton « Fermer ce détail » permet de revenir à la comptabilité complète.
 
 Version : 4.0.6
+
+
+Correctif complémentaire : les détails issus du bilan se ferment lors d'un changement de filtre, de dates ou de recherche. Ajout du bouton Réinitialiser les filtres.
