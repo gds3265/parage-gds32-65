@@ -2303,3 +2303,115 @@ function updateV403Identity(){document.querySelectorAll('.versionBadge').forEach
 const enterApplicationV403Base=enterApplication;
 enterApplication=async function(){const r=await enterApplicationV403Base();updateV403Identity();renderAccounting();return r;};
 setTimeout(()=>{updateV403Identity();renderAccounting();renderFarmOverviewV403();},2200);
+
+/* =====================================================================
+   V4.0.4 — Détail des impayés, y compris historique importé
+   ===================================================================== */
+const APP_VERSION_V404='4.0.4';
+const PAYMENT_DELAY_DAYS_V404=20;
+
+function invoiceDueDateV404(job){
+  const source=job.invoiceAt||job.date||'';
+  if(!source)return '';
+  const d=new Date(source+'T12:00:00');
+  d.setDate(d.getDate()+PAYMENT_DELAY_DAYS_V404);
+  return d.toISOString().slice(0,10);
+}
+function isLateV404(job){
+  if(isPaidV403(job))return false;
+  if(job.paymentStatus==='late')return true;
+  if(!isInvoicedV403(job))return false;
+  const due=invoiceDueDateV404(job);
+  return !!due&&due<today();
+}
+function isOpenV404(job){return isInvoicedV403(job)&&!isPaidV403(job);}
+function accountingJobStatusV404(job){
+  if(isLateV404(job))return ['late','Impayée / retard'];
+  if(isPaidV403(job))return ['paid','Réglée'];
+  if(isInvoicedV403(job))return ['invoiced',job.paymentStatus==='partial'?'Partiellement réglée':'Facturée / attente'];
+  if(job.accountingSentAt||job.exportedAt)return ['sent','Pro forma transmise'];
+  return ['pending','À facturer'];
+}
+function accountingFilteredRowsV404(){
+  return accountingBaseRowsV403().filter(j=>
+    accountingFilterV403==='all'||
+    (accountingFilterV403==='to_invoice'&&isToInvoiceV403(j))||
+    (accountingFilterV403==='open'&&isOpenV404(j))||
+    (accountingFilterV403==='late'&&isLateV404(j))||
+    (accountingFilterV403==='paid'&&isPaidV403(j))
+  );
+}
+function accountingHistoryBadgeV404(job){
+  return job.importedHistory?'<span class="historySourceBadge">Historique importé</span>':'';
+}
+function accountingRowDetailsV404(job){
+  const due=invoiceDueDateV404(job);
+  const daysOpen=daysSinceV403(job.invoiceAt||job.date);
+  const overdue=due&&due<today()?Math.max(0,Math.floor((new Date(today())-new Date(due))/(86400000))):0;
+  return `${job.invoiceNo?`Facture ${esc(job.invoiceNo)}`:'Sans numéro de facture'}${job.invoiceAt?` · émise le ${fmtDate(job.invoiceAt)}`:''}${due?` · échéance estimée ${fmtDate(due)}`:''}${isLateV404(job)?` · <b>${overdue} jour(s) de retard</b>`:isOpenV404(job)&&daysOpen!==''?` · ouverte depuis ${daysOpen} jour(s)`:''}`;
+}
+function renderAccounting(){
+  if($('accountingStart')&&!$('accountingStart').dataset.ready){$('accountingStart').value='';$('accountingEnd').value='';$('accountingStart').dataset.ready='1';}
+  const base=accountingBaseRowsV403(),arr=accountingFilteredRowsV404();
+  const toInvoice=base.filter(isToInvoiceV403),invoiced=base.filter(isInvoicedV403),open=base.filter(isOpenV404),late=base.filter(isLateV404),paid=base.filter(isPaidV403);
+  const sum=a=>a.reduce((s,j)=>s+accountingAmountV403(j),0);
+  if($('accountingCards'))$('accountingCards').innerHTML=
+    accountingCardV403('Tous les dossiers',base.length,sum(base),'all')+
+    accountingCardV403('À facturer',toInvoice.length,sum(toInvoice),'to_invoice')+
+    accountingCardV403('À encaisser',open.length,sum(open),'open')+
+    accountingCardV403('Impayés / retard',late.length,sum(late),'late')+
+    accountingCardV403('Réglés',paid.length,sum(paid),'paid');
+  document.querySelectorAll('[data-accounting-filter]').forEach(b=>b.classList.toggle('active',b.dataset.accountingFilter===accountingFilterV403));
+  const totalHT=base.reduce((s,j)=>s+(calc(j).ht||0),0),totalTTC=sum(base),encaisse=sum(paid),reste=sum(open),facture=sum(invoiced),listedTotal=sum(arr);
+  if($('accountingSummary'))$('accountingSummary').innerHTML=`<h3>Vision comptable complète</h3><div class="accountingSummaryGrid"><div>CA HT total<b>${euro(totalHT)}</b></div><div>CA TTC total<b>${euro(totalTTC)}</b></div><div>Facturé TTC<b>${euro(facture)}</b></div><div>Encaissé<b>${euro(encaisse)}</b></div><div>Reste à encaisser<b><button class="amountLink" onclick="setAccountingFilterV403('open')">${euro(reste)}</button></b></div><div>Dossiers à facturer<b>${toInvoice.length}</b></div><div>Factures ouvertes<b>${open.length}</b></div><div>Impayés / retard<b><button class="amountLink" onclick="setAccountingFilterV403('late')">${late.length} · ${euro(sum(late))}</button></b></div></div><div class="accountingSelectionTotal"><span>Liste affichée : <b>${arr.length} dossier(s)</b></span><strong>${euro(listedTotal)} TTC</strong></div><p class="hint">Les anciennes factures importées sont incluses. Une facture non réglée est classée en retard 20 jours après sa date de facturation.</p>`;
+  if(!$('accountingList'))return;
+  $('accountingList').innerHTML=arr.map(j=>{
+    const c=calc(j),st=accountingJobStatusV404(j),isHist=j.importedHistory;
+    return `<div class="row accountingRow ${st[0]==='late'?'highlightLate':isOpenV404(j)?'highlightOpen':''}">
+      <input type="checkbox" class="accountingCheck" value="${j.id}" ${isToInvoiceV403(j)?'checked':''}>
+      <div class="grow"><div class="accountingTitleLine"><b>${fmtDate(j.date)} — ${esc(j.clientName||j.cheptel)}</b>${accountingHistoryBadgeV404(j)}</div><small>${esc(j.cheptel)} · ${c.n} bovin(s) · <b>${euro(c.ttc)} TTC</b>${j.cpVille?` · ${esc(j.cpVille)}`:''}</small><div class="accountingDetailNote">${accountingRowDetailsV404(j)}</div>${j.paymentMethod?`<div class="accountingDetailNote">Mode de règlement : ${esc(j.paymentMethod)}</div>`:''}</div>
+      <span class="status ${st[0]}">${st[1]}</span>
+      ${canEditAccounting()?`<label class="compactField">N° facture<input value="${esc(j.invoiceNo||'')}" onchange="updateAccountingJob('${j.id}','invoiceNo',this.value)"></label><label class="compactField">Date facture<input type="date" value="${esc(j.invoiceAt||'')}" onchange="updateAccountingJob('${j.id}','invoiceAt',this.value)"></label><select onchange="setAccountingStatus('${j.id}',this.value)"><option value="pending" ${!isInvoicedV403(j)&&!j.accountingSentAt?'selected':''}>À facturer</option><option value="sent" ${j.paymentStatus==='sent'?'selected':''}>Pro forma transmise</option><option value="invoiced" ${j.paymentStatus==='invoiced'?'selected':''}>Facturée / attente</option><option value="partial" ${j.paymentStatus==='partial'?'selected':''}>Partiellement réglée</option><option value="paid" ${isPaidV403(j)?'selected':''}>Réglée</option><option value="late" ${isLateV404(j)?'selected':''}>Impayée / retard</option></select>`:''}
+      <button onclick="${isHist?`openHistoricalSummaryV402('${j.id}')`:`openStoredProformaForJob('${j.id}')`}">${isHist?'Voir le dossier':'Pro forma'}</button>
+    </div>`;
+  }).join('')||`<div class="panel emptyAccounting"><h3>Aucun dossier</h3><p>Aucun chantier ne correspond à cette période, cette recherche et ce statut.</p></div>`;
+}
+
+function openAccountingFromBalanceV404(filter){
+  const start=$('filterStart')?.value||'',end=$('filterEnd')?.value||'';
+  showView('accounting');
+  if($('accountingStart'))$('accountingStart').value=start;
+  if($('accountingEnd'))$('accountingEnd').value=end;
+  accountingFilterV403=filter;
+  renderAccounting();
+  setTimeout(()=>$('accountingList')?.scrollIntoView({behavior:'smooth',block:'start'}),80);
+}
+
+const renderStatsV404Base=renderStats;
+renderStats=function(){
+  const result=renderStatsV404Base();
+  const {selected}=filteredBalanceData();
+  const openJobs=selected.map(x=>x.job).filter(isOpenV404),lateJobs=selected.map(x=>x.job).filter(isLateV404),paidJobs=selected.map(x=>x.job).filter(isPaidV403);
+  const sum=a=>a.reduce((s,j)=>s+accountingAmountV403(j),0);
+  const cards=$('economicCards');
+  if(cards){
+    [...cards.children].forEach(el=>{
+      const label=(el.querySelector('span')?.textContent||'').trim();
+      if(label==='Reste à encaisser'){
+        el.outerHTML=`<button class="card clickableCard" onclick="openAccountingFromBalanceV404('open')"><span>Reste à encaisser</span><b>${euro(sum(openJobs))}</b><small>${openJobs.length} dossier(s) — voir le détail</small></button>`;
+      }
+    });
+    cards.insertAdjacentHTML('beforeend',`<button class="card clickableCard alertCard" onclick="openAccountingFromBalanceV404('late')"><span>Impayés / retard</span><b>${euro(sum(lateJobs))}</b><small>${lateJobs.length} dossier(s) — voir le détail</small></button><button class="card clickableCard" onclick="openAccountingFromBalanceV404('paid')"><span>Règlements</span><b>${euro(sum(paidJobs))}</b><small>${paidJobs.length} dossier(s)</small></button>`);
+  }
+  const tables=$('economicTables');
+  if(tables){
+    const detailRows=openJobs.sort((a,b)=>(a.invoiceAt||a.date||'').localeCompare(b.invoiceAt||b.date||'')).map(j=>`<tr class="${isLateV404(j)?'lateRow':''}"><td>${fmtDate(j.date)}</td><td>${esc(j.clientName||'')}</td><td>${esc(j.cheptel||'')}</td><td>${j.invoiceNo?esc(j.invoiceNo):'—'}</td><td>${fmtDate(j.invoiceAt||'')}</td><td>${euro(accountingAmountV403(j))}</td><td>${accountingJobStatusV404(j)[1]}</td><td><button onclick="openAccountingFromBalanceV404('${isLateV404(j)?'late':'open'}')">Voir</button></td></tr>`).join('');
+    tables.insertAdjacentHTML('beforeend',`<div class="panel economicOutstandingPanel"><div class="toolbar"><h3>Détail du reste à encaisser</h3><button onclick="openAccountingFromBalanceV404('open')">Ouvrir dans Comptabilité</button></div><p><b>${openJobs.length} dossier(s) · ${euro(sum(openJobs))} TTC</b></p><div class="tableScroll"><table><tr><th>Chantier</th><th>Éleveur</th><th>Cheptel</th><th>Facture</th><th>Facturé le</th><th>Montant</th><th>État</th><th></th></tr>${detailRows||'<tr><td colspan="8">Aucun montant restant à encaisser pour les filtres sélectionnés.</td></tr>'}</table></div></div>`);
+  }
+  return result;
+};
+
+function updateV404Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.4');document.title='Suivi Parage v4.0.4';}
+const enterApplicationV404Base=enterApplication;
+enterApplication=async function(){const r=await enterApplicationV404Base();updateV404Identity();renderAccounting();return r;};
+setTimeout(()=>{updateV404Identity();renderAccounting();},2600);
