@@ -11,7 +11,7 @@ const feet = [
   ['PArD', 'Postérieur droit']
 ];
 
-const issues = ['Cerise', 'Abcès', 'Dermatite', 'Ulcère de sole', 'Ligne blanche', 'Fourchet', 'Limace', 'Seime', 'Double sole', 'Hémorragie', 'Décollement', 'Autre'];
+const issues = ['Cerise', 'Abcès', 'Dermatite', 'Ulcère de sole', 'Ligne blanche', 'Fourchet', 'Limace', 'Seime', 'Double sole', 'Hémorragie', 'Décollement', 'Nécrose', 'Autre'];
 const care = ['Parage', 'Pansement', 'Talonnette', 'Désinfection', 'À surveiller', 'À revoir'];
 const races = ['abondance', 'angus', 'aubrac', 'autre', 'bazadaise', 'blonde', 'charolaise', 'gasconne', 'jersiaise', 'limousine', 'montbéliarde', 'prim holstein', 'salers', 'simmental', 'wagyu'];
 const quickFootButtons = [
@@ -2906,3 +2906,160 @@ enterApplication=async function(){
   return r;
 };
 setTimeout(async()=>{await ensureAccountingHistoryV409();updateV410Identity();renderAccountingV410();},4600);
+
+
+/* =====================================================================
+   V4.0.11 — CA mensuel accueil + Nécrose + pro forma multipage
+   ===================================================================== */
+const APP_VERSION_V411='4.0.11';
+
+/* Accueil : ajoute le CA TTC du mois en cours sur les dossiers validés. */
+const renderHomeV411Base=renderHome;
+renderHome=function(){
+  renderHomeV411Base();
+  const month=today().slice(0,7);
+  const monthRevenue=(jobs||[])
+    .filter(j=>j && !j.trashedAt && !j.cancelledAt && String(j.date||'').startsWith(month) && (j.status==='finished' || j.importedHistory===true))
+    .reduce((sum,j)=>sum+(Number(calc(j).ttc)||0),0);
+  if($('homeCards')) $('homeCards').insertAdjacentHTML('beforeend',card('CA TTC du mois',euro(monthRevenue)));
+};
+
+function makeProformaPdfV411(job){
+  const c=calc(job), fl=Object.fromEntries(feet), pageW=595, margin=34;
+  const ax=[34,88,150,315,450,561];
+  const animalRows=(job.animals||[]).map(a=>{
+    ensureWorkedFeet(a);
+    const probs=[],soins=new Set();
+    for(const [k,d] of Object.entries(a.claws||{})){
+      if((d.issues||[]).length)probs.push(`${k}: ${(d.issues||[]).join(', ')}`);
+      for(const x of (d.care||[])) if(x==='Pansement'||x==='Talonnette') soins.add(x);
+    }
+    const vals=[a.number||'-',categoryLabels[a.category]||a.category||'-',(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')||'-',probs.join('; ')||'RAS',[...soins].join(', ')||'-'];
+    const wrapped=vals.map((v,i)=>pdfWrap311(v,[8,11,28,24,16][i]));
+    const lines=Math.max(...wrapped.map(v=>v.length),1);
+    return {a,wrapped,h:Math.max(20,lines*9+5)+(a.checkNext?15:0)};
+  });
+
+  /* Répartition : on remplit d'abord au maximum la page 1, puis autant de pages que nécessaire. */
+  const pages=[];
+  let remaining=[...animalRows];
+  const firstStartY=372, nextStartY=730, bottomReserve=82;
+  let first=true;
+  while(remaining.length || pages.length===0){
+    let y=first?firstStartY:nextStartY;
+    const rows=[];
+    while(remaining.length){
+      const r=remaining[0];
+      if(y-r.h<bottomReserve && rows.length) break;
+      if(y-r.h<bottomReserve && !rows.length){ rows.push(remaining.shift()); break; }
+      rows.push(remaining.shift()); y-=r.h;
+    }
+    pages.push({first,rows});
+    first=false;
+  }
+
+  const streams=pages.map((page,pageIndex)=>{
+    const cmds=[];
+    const text=(x,y,size,value,bold=false)=>cmds.push(`BT /${bold?'F2':'F1'} ${size} Tf ${x} ${y} Td (${pdfEsc311(value)}) Tj ET`);
+    const line=(x1,y1,x2,y2,w=.6)=>cmds.push(`${w} w ${x1} ${y1} m ${x2} ${y2} l S`);
+    const rect=(x,y,w,h)=>cmds.push(`${x} ${y} ${w} ${h} re S`);
+    const fillRect=(x,y,w,h,g=.95)=>cmds.push(`${g} g ${x} ${y} ${w} ${h} re f 0 g`);
+    let y;
+
+    if(page.first){
+      cmds.push('q 185 0 0 53 34 779 cm /Im1 Do Q');
+      text(300,807,11.5,'PRO FORMA / COMPTE RENDU DE PARAGE',true);
+      line(margin,772,pageW-margin,772,1.2);
+      rect(margin,692,250,64); rect(310,692,251,64);
+      text(44,740,9,'GDS Gers Hautes-Pyrenees',true);
+      text(44,726,8,'3 chemin de la Caillaouere');
+      text(44,714,8,'32000 AUCH');
+      text(320,740,9,`Eleveur : ${job.clientName||''}`,true);
+      text(320,726,8,`Cheptel : ${job.cheptel||''}`);
+      text(320,714,8,`${job.address||''}`);
+      text(320,702,8,`${job.cpVille||''}`);
+      text(margin,676,9,`Date : ${fmtDate(job.date)}    Heure : ${job.start||''} - ${job.end||''}`,true);
+      text(margin,657,11,'Prestations',true);
+      const tx=[34,300,365,445,561], top=644, rowH=22;
+      fillRect(tx[0],top-rowH,tx[4]-tx[0],rowH,.92);rect(tx[0],top-rowH,tx[4]-tx[0],rowH);
+      tx.slice(1,-1).forEach(x=>line(x,top-rowH,x,top));
+      ['Prestation','Qte','Tarif HT','Total HT'].forEach((h,i)=>text(tx[i]+5,top-15,8,h,true));
+      const priceRows=[
+        ['Deplacement / mise en place',1,+job.fee||0,+job.fee||0],
+        ['Paires de pieds',c.pairs,c.pairRate,c.pairs*c.pairRate],
+        ['Pieds seuls',c.single,c.footRate,c.single*c.footRate],
+        ['Pansements',c.band,c.bandageRate,c.band*c.bandageRate],
+        ['Talonnettes',c.blocks,c.blockRate,c.blocks*c.blockRate]
+      ];
+      priceRows.forEach((r,i)=>{const ry=top-rowH*(i+2);rect(tx[0],ry,tx[4]-tx[0],rowH);tx.slice(1,-1).forEach(x=>line(x,ry,x,ry+rowH));text(tx[0]+5,ry+7,8,r[0]);text(tx[1]+10,ry+7,8,r[1]);text(tx[2]+5,ry+7,8,pdfMoney311(r[2]));text(tx[3]+5,ry+7,8,pdfMoney311(r[3]));});
+      y=top-rowH*(priceRows.length+2);
+      [['TOTAL HT',c.ht],['TVA '+settings.vat+' %',c.ttc-c.ht],['TOTAL TTC',c.ttc]].forEach((r,i)=>{rect(365,y-rowH*i,196,rowH);line(445,y-rowH*i,445,y-rowH*i+rowH);text(371,y-rowH*i+7,8,r[0],true);text(451,y-rowH*i+7,8,pdfMoney311(r[1]),true);});
+      y-=rowH*3+16;
+      text(margin,y,11,'Recapitulatif de l intervention',true); y-=16;
+    } else {
+      cmds.push('q 150 0 0 43 34 785 cm /Im1 Do Q');
+      text(225,807,11,'PRO FORMA / COMPTE RENDU DE PARAGE - SUITE',true);
+      text(margin,766,8.5,`${job.clientName||''} - Cheptel ${job.cheptel||''} - ${fmtDate(job.date)}`,true);
+      line(margin,754,pageW-margin,754,1);
+      text(margin,744,10,'Recapitulatif de l intervention (suite)',true);
+      y=730;
+    }
+
+    const headerY=y;
+    fillRect(ax[0],headerY-20,ax[5]-ax[0],20,.92);rect(ax[0],headerY-20,ax[5]-ax[0],20);ax.slice(1,-1).forEach(x=>line(x,headerY-20,x,headerY));
+    ['N bovin','Categorie','Pieds realises','Problemes','Soins'].forEach((h,i)=>text(ax[i]+4,headerY-13,7.5,h,true));
+    y=headerY-20;
+    for(const r of page.rows){
+      const baseH=r.h-(r.a.checkNext?15:0);
+      rect(ax[0],y-baseH,ax[5]-ax[0],baseH);ax.slice(1,-1).forEach(x=>line(x,y-baseH,x,y));
+      r.wrapped.forEach((ls,i)=>ls.forEach((t,j)=>text(ax[i]+3,y-11-j*9,7,t)));
+      y-=baseH;
+      if(r.a.checkNext){
+        fillRect(ax[0],y-15,ax[5]-ax[0],15,.96);rect(ax[0],y-15,ax[5]-ax[0],15);
+        text(ax[0]+5,y-10,7,'BOVIN A CONTROLER A LA PROCHAINE VISITE',true);y-=15;
+      }
+    }
+
+    if(pageIndex===pages.length-1){
+      y=Math.min(y-12,68);
+      /* Le pied de page est placé dans une zone fixe pour ne jamais masquer le récapitulatif. */
+      text(margin,62,8,`Modalite : ${job.paymentTiming||'A reception'}     Mode : ${job.paymentMethod||'Cheque'}`,true);
+      text(margin,49,7.5,'Paiement a 20 jours - IBAN FR76 1690 6010 2003 4001 9914 139 - BIC AGRIFRPP869');
+      text(margin,36,7.5,'Document pro forma etabli sur place. La facture definitive sera emise par la comptabilite.');
+    } else {
+      text(500,30,7,`Page ${pageIndex+1}/${pages.length}`);
+    }
+    return cmds.join('\n');
+  });
+
+  const objects=[];
+  const pageObjNums=[], contentObjNums=[];
+  let next=3;
+  for(let i=0;i<streams.length;i++){ pageObjNums.push(next++); contentObjNums.push(next++); }
+  const font1=next++, font2=next++, image=next++;
+  objects[1]='<< /Type /Catalog /Pages 2 0 R >>';
+  objects[2]=`<< /Type /Pages /Kids [${pageObjNums.map(n=>n+' 0 R').join(' ')}] /Count ${streams.length} >>`;
+  for(let i=0;i<streams.length;i++){
+    objects[pageObjNums[i]]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${font1} 0 R /F2 ${font2} 0 R >> /XObject << /Im1 ${image} 0 R >> >> /Contents ${contentObjNums[i]} 0 R >>`;
+    objects[contentObjNums[i]]=`<< /Length ${streams[i].length} >>\nstream\n${streams[i]}\nendstream`;
+  }
+  objects[font1]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+  objects[font2]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+  objects[image]=`<< /Type /XObject /Subtype /Image /Width 737 /Height 212 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter [/ASCIIHexDecode /DCTDecode] /Length ${GDS_LOGO_JPEG_HEX_312.length} >>\nstream\n${GDS_LOGO_JPEG_HEX_312}\nendstream`;
+  return buildPdf311(objects);
+}
+
+proformaPdfBlob=function(job){return new Blob([makeProformaPdfV411(job)],{type:'application/pdf'});};
+
+function updateV411Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.11');
+  document.title='Suivi Parage v4.0.11';
+}
+const enterApplicationV411Base=enterApplication;
+enterApplication=async function(){
+  const r=await enterApplicationV411Base();
+  updateV411Identity();
+  renderHome();
+  return r;
+};
+setTimeout(()=>{updateV411Identity();if($('homeCards'))renderHome();},5000);
