@@ -136,7 +136,7 @@ function blankJob() {
     end: '',
     fee: settings.defaultFee,
     paymentTiming: 'À réception',
-    paymentMethod: 'Chèque',
+    paymentMethod: '',
     customPairRate: null, customFootRate: null, customBandageRate: null, customBlockRate: null,
     comment: '',
     animals: [],
@@ -657,7 +657,7 @@ function printProforma() {
     </table>
 
     ${current.comment ? `<p><b>Commentaire chantier :</b> ${esc(current.comment)}</p>` : ''}
-    <div class="payment"><b>Modalité :</b> ${esc(current.paymentTiming || 'À réception')} &nbsp; <b>Mode de règlement :</b> ${esc(current.paymentMethod || 'Chèque')}<br>
+    <div class="payment"><b>Modalité :</b> ${esc(current.paymentTiming || 'À réception')} &nbsp; <b>Mode de règlement :</b> ${esc(current.paymentMethod || 'À définir')}<br>
       <b>Conditions :</b> Paiement à 20 jours — Chèque à l'ordre du GDS32, espèces ou virement.<br>
       IBAN : FR76 1690 6010 2003 4001 9914 139 — BIC : AGRIFRPP869
     </div>
@@ -695,7 +695,7 @@ function compactProformaBody(job) {
     if (animal.checkNext) notes.push('À contrôler à la prochaine visite');
     animalRows.push(`<tr><td>${esc(animal.number||'—')}</td><td>${esc(categoryLabels[animal.category]||animal.category||'—')}</td><td>${esc(feetDone)}</td><td>${esc(problems.join(' ; ')||'—')}</td><td>${esc([...careSet].join(', ')||'—')}</td><td>${esc(notes.join(' ; ')||'—')}</td></tr>`);
   }
-  return `<section class="proformaPage"><div class="pfTop"><img src="${LOGO_DATA}" alt="Logo GDS"><div><h1>FACTURE PRO FORMA / COMPTE RENDU DE PARAGE</h1><small>Document édité sur place</small></div></div><div class="pfCols"><div><b>GDS Gers Hautes-Pyrénées</b><br>${nl2br(settings.businessDetails)}</div><div><b>Éleveur :</b> ${esc(job.clientName)}<br><b>Cheptel :</b> ${esc(job.cheptel)}<br>${esc(job.address)}<br>${esc(job.cpVille)}<br><b>Date :</b> ${fmtDate(job.date)} ${job.start||''}${job.end?'–'+job.end:''}</div></div><table><tr><th>Prestation</th><th>Qté</th><th>Tarif HT</th><th>Total HT</th></tr><tr><td>Déplacement et mise en place</td><td>1</td><td>${euro(job.fee)}</td><td>${euro(job.fee)}</td></tr><tr><td>Paires de pieds</td><td>${c.pairs}</td><td>${euro(c.pairRate)}</td><td>${euro(c.pairs*c.pairRate)}</td></tr><tr><td>Pieds seuls</td><td>${c.single}</td><td>${euro(c.footRate)}</td><td>${euro(c.single*c.footRate)}</td></tr><tr><td>Pansements</td><td>${c.band}</td><td>${euro(c.bandageRate)}</td><td>${euro(c.band*c.bandageRate)}</td></tr><tr><td>Talonnettes</td><td>${c.blocks}</td><td>${euro(c.blockRate)}</td><td>${euro(c.blocks*c.blockRate)}</td></tr><tr><th colspan="3">Total HT</th><th>${euro(c.ht)}</th></tr><tr><th colspan="3">TVA ${settings.vat}%</th><th>${euro(c.ttc-c.ht)}</th></tr><tr><th colspan="3">Total TTC</th><th>${euro(c.ttc)}</th></tr></table><h2>Récapitulatif de l’intervention</h2><table><tr><th>N°</th><th>Catégorie</th><th>Pieds</th><th>Problèmes</th><th>Soins</th><th>Observation</th></tr>${animalRows.join('')||'<tr><td colspan="6">Aucun bovin enregistré.</td></tr>'}</table><p><b>Modalité :</b> ${esc(job.paymentTiming||'À réception')} — <b>Mode :</b> ${esc(job.paymentMethod||'Chèque')}</p><p class="small">Paiement à 20 jours · IBAN FR76 1690 6010 2003 4001 9914 139 · BIC AGRIFRPP869</p></section>`;
+  return `<section class="proformaPage"><div class="pfTop"><img src="${LOGO_DATA}" alt="Logo GDS"><div><h1>FACTURE PRO FORMA / COMPTE RENDU DE PARAGE</h1><small>Document édité sur place</small></div></div><div class="pfCols"><div><b>GDS Gers Hautes-Pyrénées</b><br>${nl2br(settings.businessDetails)}</div><div><b>Éleveur :</b> ${esc(job.clientName)}<br><b>Cheptel :</b> ${esc(job.cheptel)}<br>${esc(job.address)}<br>${esc(job.cpVille)}<br><b>Date :</b> ${fmtDate(job.date)} ${job.start||''}${job.end?'–'+job.end:''}</div></div><table><tr><th>Prestation</th><th>Qté</th><th>Tarif HT</th><th>Total HT</th></tr><tr><td>Déplacement et mise en place</td><td>1</td><td>${euro(job.fee)}</td><td>${euro(job.fee)}</td></tr><tr><td>Paires de pieds</td><td>${c.pairs}</td><td>${euro(c.pairRate)}</td><td>${euro(c.pairs*c.pairRate)}</td></tr><tr><td>Pieds seuls</td><td>${c.single}</td><td>${euro(c.footRate)}</td><td>${euro(c.single*c.footRate)}</td></tr><tr><td>Pansements</td><td>${c.band}</td><td>${euro(c.bandageRate)}</td><td>${euro(c.band*c.bandageRate)}</td></tr><tr><td>Talonnettes</td><td>${c.blocks}</td><td>${euro(c.blockRate)}</td><td>${euro(c.blocks*c.blockRate)}</td></tr><tr><th colspan="3">Total HT</th><th>${euro(c.ht)}</th></tr><tr><th colspan="3">TVA ${settings.vat}%</th><th>${euro(c.ttc-c.ht)}</th></tr><tr><th colspan="3">Total TTC</th><th>${euro(c.ttc)}</th></tr></table><h2>Récapitulatif de l’intervention</h2><table><tr><th>N°</th><th>Catégorie</th><th>Pieds</th><th>Problèmes</th><th>Soins</th><th>Observation</th></tr>${animalRows.join('')||'<tr><td colspan="6">Aucun bovin enregistré.</td></tr>'}</table><p><b>Modalité :</b> ${esc(job.paymentTiming||'À réception')} — <b>Mode :</b> ${esc(job.paymentMethod||'À définir')}</p><p class="small">Paiement à 20 jours · IBAN FR76 1690 6010 2003 4001 9914 139 · BIC AGRIFRPP869</p></section>`;
 }
 
 function fullProformaDocument(rows, autoPrint=false) {
@@ -818,6 +818,7 @@ function restoreData(e) {
       jobs = x.jobs || [];
       settings = Object.assign(settings, x.settings || {});
       costs = x.costs || {};
+      if (Array.isArray(x.tariffHistory)) { tariffHistory = x.tariffHistory; localStorage.setItem('parage.tariffHistory', JSON.stringify(tariffHistory)); }
       saveAll();
       localStorage.setItem('parage.settings', JSON.stringify(settings));
       localStorage.setItem('parage.costs', JSON.stringify(costs));
@@ -1356,7 +1357,7 @@ async function sharedCloudRestore(silent=false){
     if(!r.ok)throw new Error(await r.text());const rows=await r.json();
     if(!rows.length){if(canEditJobs()||canEditAccounting())await sharedCloudBackup(false);return true;}
     const p=rows[0].payload||{};
-    jobs=p.jobs||jobs;costs=p.costs||costs;addressOverrides=p.addressOverrides||addressOverrides;importedClients=p.importedClients||importedClients;
+    jobs=p.jobs||jobs;costs=p.costs||costs;addressOverrides=p.addressOverrides||addressOverrides;importedClients=p.importedClients||importedClients;if(Array.isArray(p.tariffHistory)){tariffHistory=p.tariffHistory;localStorage.setItem('parage.tariffHistory',JSON.stringify(tariffHistory));}
     const localCloud={supabaseUrl:settings.supabaseUrl,supabaseKey:settings.supabaseKey,accountingEmail:settings.accountingEmail};
     settings=Object.assign(settings,p.settings||{},localCloud);
     originalSaveAllV3();localStorage.setItem('parage.costs',JSON.stringify(costs));localStorage.setItem('parage.addressOverrides',JSON.stringify(addressOverrides));localStorage.setItem('parage.importedClients',JSON.stringify(importedClients));localStorage.setItem('parage.settings',JSON.stringify(settings));
@@ -1608,7 +1609,7 @@ function makeProformaPdfV311(job){
       }
     }
   }
-  y-=12;text(margin,y,8,`Modalite : ${job.paymentTiming||'A reception'}     Mode : ${job.paymentMethod||'Cheque'}`,true);
+  y-=12;text(margin,y,8,`Modalite : ${job.paymentTiming||'A reception'}     Mode : ${job.paymentMethod||'A definir'}`,true);
   y-=13;text(margin,y,7.5,'Paiement a 20 jours - IBAN FR76 1690 6010 2003 4001 9914 139 - BIC AGRIFRPP869');
   y-=13;text(margin,y,7.5,'Document pro forma etabli sur place. La facture definitive sera emise par la comptabilite.');
   const stream=cmds.join('\n'), objects=[];
@@ -2371,7 +2372,7 @@ function renderAccounting(){
       <input type="checkbox" class="accountingCheck" value="${j.id}" ${isToInvoiceV403(j)?'checked':''}>
       <div class="grow"><div class="accountingTitleLine"><b>${fmtDate(j.date)} — ${esc(j.clientName||j.cheptel)}</b>${accountingHistoryBadgeV404(j)}</div><small>${esc(j.cheptel)} · ${c.n} bovin(s) · <b>${euro(c.ttc)} TTC</b>${j.cpVille?` · ${esc(j.cpVille)}`:''}</small><div class="accountingDetailNote">${accountingRowDetailsV404(j)}</div>${j.paymentMethod?`<div class="accountingDetailNote">Mode de règlement : ${esc(j.paymentMethod)}</div>`:''}</div>
       <span class="status ${st[0]}">${st[1]}</span>
-      ${canEditAccounting()?`<label class="compactField">N° facture<input value="${esc(j.invoiceNo||'')}" onchange="updateAccountingJob('${j.id}','invoiceNo',this.value)"></label><label class="compactField">Date facture<input type="date" value="${esc(j.invoiceAt||'')}" onchange="updateAccountingJob('${j.id}','invoiceAt',this.value)"></label><select onchange="setAccountingStatus('${j.id}',this.value)"><option value="pending" ${!isInvoicedV403(j)&&!j.accountingSentAt?'selected':''}>À facturer</option><option value="sent" ${j.paymentStatus==='sent'?'selected':''}>Pro forma transmise</option><option value="invoiced" ${j.paymentStatus==='invoiced'?'selected':''}>Facturée / attente</option><option value="partial" ${j.paymentStatus==='partial'?'selected':''}>Partiellement réglée</option><option value="paid" ${isPaidV403(j)?'selected':''}>Réglée</option><option value="late" ${isLateV404(j)?'selected':''}>Impayée / retard</option></select>`:''}
+      ${canEditAccounting()?`<label class="compactField">N° facture<input value="${esc(j.invoiceNo||'')}" onchange="updateAccountingJob('${j.id}','invoiceNo',this.value)"></label><label class="compactField">Date facture<input type="date" value="${esc(j.invoiceAt||'')}" onchange="updateAccountingJob('${j.id}','invoiceAt',this.value)"></label><select onchange="setAccountingStatus('${j.id}',this.value)"><option value="pending" ${!isInvoicedV403(j)&&!j.accountingSentAt?'selected':''}>À facturer</option><option value="sent" ${j.paymentStatus==='sent'?'selected':''}>Pro forma transmise</option><option value="invoiced" ${j.paymentStatus==='invoiced'?'selected':''}>Facturée / attente</option><option value="partial" ${j.paymentStatus==='partial'?'selected':''}>Partiellement réglée</option><option value="paid" ${isPaidV403(j)?'selected':''}>Réglée</option><option value="late" ${isLateV404(j)?'selected':''}>Impayée / retard</option></select><label class="compactField">Mode règlement<select onchange="updateAccountingJob('${j.id}','paymentMethod',this.value)"><option value="" ${!j.paymentMethod?'selected':''}>À définir</option><option value="Chèque" ${j.paymentMethod==='Chèque'?'selected':''}>Chèque</option><option value="Espèces" ${j.paymentMethod==='Espèces'?'selected':''}>Espèces</option><option value="Virement" ${j.paymentMethod==='Virement'?'selected':''}>Virement</option></select></label>`:''}
       <button onclick="${isHist?`openHistoricalSummaryV402('${j.id}')`:`openStoredProformaForJob('${j.id}')`}">${isHist?'Voir le dossier':'Pro forma'}</button>
     </div>`;
   }).join('')||`<div class="panel emptyAccounting"><h3>Aucun dossier</h3><p>Aucun chantier ne correspond à cette période, cette recherche et ce statut.</p></div>`;
@@ -3023,7 +3024,7 @@ function makeProformaPdfV411(job){
     if(pageIndex===pages.length-1){
       y=Math.min(y-12,68);
       /* Le pied de page est placé dans une zone fixe pour ne jamais masquer le récapitulatif. */
-      text(margin,62,8,`Modalite : ${job.paymentTiming||'A reception'}     Mode : ${job.paymentMethod||'Cheque'}`,true);
+      text(margin,62,8,`Modalite : ${job.paymentTiming||'A reception'}     Mode : ${job.paymentMethod||'A definir'}`,true);
       text(margin,49,7.5,'Paiement a 20 jours - IBAN FR76 1690 6010 2003 4001 9914 139 - BIC AGRIFRPP869');
       text(margin,36,7.5,'Document pro forma etabli sur place. La facture definitive sera emise par la comptabilite.');
     } else {
@@ -3063,3 +3064,170 @@ enterApplication=async function(){
   return r;
 };
 setTimeout(()=>{updateV411Identity();if($('homeCards'))renderHome();},5000);
+
+
+/* =====================================================================
+   V4.0.12 — règlement à réception + historique tarifaire + tarifs figés
+   ===================================================================== */
+const APP_VERSION_V412='4.0.12';
+let tariffHistory=JSON.parse(localStorage.getItem('parage.tariffHistory')||'[]');
+const tariffKeysV412={
+  defaultFee:'Forfait déplacement / mise en place',
+  pairOne:'Paire de pieds — 1 bovin',
+  pairMany:'Paire de pieds — ≥2 bovins',
+  footOne:'Pied à l’unité — 1 bovin',
+  footMany:'Pied à l’unité — ≥2 bovins',
+  bandagePrice:'Pansement',
+  blockPrice:'Talonnette',
+  vat:'TVA'
+};
+
+function paymentMethodLabelV412(job){return String(job?.paymentMethod||'').trim()||'À définir';}
+function syncPaymentMethodRuleV412(){
+  const timing=$('paymentTiming'),method=$('paymentMethod');
+  if(!timing||!method)return;
+  if(timing.value==='À réception'){
+    method.value='';
+    method.disabled=true;
+    method.title='Le mode réel sera renseigné par la comptabilité lors du règlement.';
+    if(current)current.paymentMethod='';
+  }else{
+    method.disabled=false;
+    method.title='';
+  }
+}
+function installPaymentRuleV412(){
+  const timing=$('paymentTiming');
+  if(timing&&!timing.dataset.v412){
+    timing.dataset.v412='1';
+    timing.addEventListener('change',()=>{syncPaymentMethodRuleV412();syncJob();});
+  }
+  syncPaymentMethodRuleV412();
+}
+const fillJobV412Base=fillJob;
+fillJob=function(){const r=fillJobV412Base();installPaymentRuleV412();return r;};
+
+function pricingSnapshotV412(job){
+  if(!job||job.importedHistory)return null;
+  const c=calc(job);
+  return {
+    at:new Date().toISOString(),
+    fee:+job.fee||0,
+    vat:+settings.vat||0,
+    pairRate:+c.pairRate||0,
+    footRate:+c.footRate||0,
+    bandageRate:+c.bandageRate||0,
+    blockRate:+c.blockRate||0,
+    careTotal:+c.careTotal||0,
+    ht:+c.ht||0,
+    ttc:+c.ttc||0
+  };
+}
+function lockFinishedPricingV412(job){
+  if(!job||job.importedHistory||job.lockedPricingV412)return false;
+  job.lockedPricingV412=pricingSnapshotV412(job);
+  return !!job.lockedPricingV412;
+}
+const calcV412Base=calc;
+calc=function(job=current){
+  if(job?.lockedPricingV412&&!job.importedHistory){
+    const base=calcV412Base(job),p=job.lockedPricingV412;
+    return Object.assign({},base,{
+      pairRate:+p.pairRate||0,footRate:+p.footRate||0,bandageRate:+p.bandageRate||0,blockRate:+p.blockRate||0,
+      careTotal:+p.careTotal||0,ht:+p.ht||0,ttc:+p.ttc||0,lockedPricing:true
+    });
+  }
+  return calcV412Base(job);
+};
+
+function migrateFinishedPricingV412(){
+  let changed=0;
+  for(const j of jobs||[]){
+    if(j&&j.status==='finished'&&!j.importedHistory&&!j.lockedPricingV412){
+      /* Migration unique : on fige les montants tels qu'ils sont calculés au moment de l'installation de la V4.0.12. */
+      j.lockedPricingV412=pricingSnapshotV412(j);changed++;
+    }
+  }
+  if(changed){saveAll();localStorage.setItem('parage.pricingMigrationV412',new Date().toISOString());}
+  return changed;
+}
+
+const finishJobV412Base=finishJob;
+finishJob=function(){
+  syncJob();
+  if(current&&!current.importedHistory&&!current.lockedPricingV412) current.lockedPricingV412=pricingSnapshotV412(current);
+  return finishJobV412Base();
+};
+
+function tariffHistoryPanelV412(){
+  const section=$('settings');if(!section)return;
+  if(!$('tariffChangeMetaV412')){
+    const meta=document.createElement('div');meta.id='tariffChangeMetaV412';meta.className='panel';
+    meta.innerHTML=`<h3>Modification tarifaire</h3><div class="grid2"><label>Date d'effet<input id="tariffEffectiveDateV412" type="date" value="${today()}"></label><label>Motif éventuel<input id="tariffReasonV412" placeholder="Ex. révision annuelle, décision CA…"></label></div><p class="hint">Ces informations sont enregistrées uniquement lorsqu’un tarif ou la TVA change.</p>`;
+    const saveBtn=section.querySelector('button.primary');
+    if(saveBtn)saveBtn.before(meta);else section.prepend(meta);
+  }
+  if(!$('tariffHistoryV412')){
+    const p=document.createElement('div');p.id='tariffHistoryV412';p.className='panel';
+    const backup=section.querySelector('.panel:last-of-type');
+    if(backup)backup.before(p);else section.appendChild(p);
+  }
+  renderTariffHistoryV412();
+}
+function renderTariffHistoryV412(){
+  const el=$('tariffHistoryV412');if(!el)return;
+  const rows=[...(tariffHistory||[])].sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+  el.innerHTML=`<div class="toolbar"><h3>Historique des modifications tarifaires</h3>${rows.length?`<button type="button" onclick="exportTariffHistoryV412()">Exporter CSV</button>`:''}</div>${rows.length?`<div class="tableScroll"><table><tr><th>Date</th><th>Utilisateur</th><th>Tarif</th><th>Ancien</th><th>Nouveau</th><th>Date d'effet</th><th>Motif</th></tr>${rows.map(x=>`<tr><td>${new Date(x.at).toLocaleString('fr-FR')}</td><td>${esc(x.user||'')}</td><td>${esc(x.label||x.key||'')}</td><td>${euro(x.oldValue)}</td><td>${euro(x.newValue)}</td><td>${fmtDate(x.effectiveDate||'')}</td><td>${esc(x.reason||'')}</td></tr>`).join('')}</table></div>`:'<p>Aucune modification tarifaire enregistrée.</p>'}`;
+}
+function exportTariffHistoryV412(){
+  const rows=[['Date','Utilisateur','Tarif','Ancien tarif','Nouveau tarif','Date effet','Motif'],...(tariffHistory||[]).map(x=>[x.at,x.user,x.label||x.key,x.oldValue,x.newValue,x.effectiveDate,x.reason||''])];
+  const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n');
+  download(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),`Historique_tarifs_${today()}.csv`);
+}
+
+const saveSettingsV412Base=saveSettings;
+saveSettings=function(){
+  const before={};Object.keys(tariffKeysV412).forEach(k=>before[k]=Number(settings[k]||0));
+  const effectiveDate=$('tariffEffectiveDateV412')?.value||today();
+  const reason=($('tariffReasonV412')?.value||'').trim();
+  const result=saveSettingsV412Base();
+  const user=currentUserLabelV4?.()||'Utilisateur local';
+  const at=new Date().toISOString();let changed=0;
+  Object.keys(tariffKeysV412).forEach(k=>{
+    const after=Number(settings[k]||0);
+    if(before[k]!==after){
+      tariffHistory.unshift({id:uid(),at,user,key:k,label:tariffKeysV412[k],oldValue:before[k],newValue:after,effectiveDate,reason});changed++;
+      logActionV4?.('Paramètres','Tarif modifié',null,`${tariffKeysV412[k]} : ${before[k]} → ${after}; effet ${effectiveDate}${reason?'; '+reason:''}`);
+    }
+  });
+  if(changed){
+    localStorage.setItem('parage.tariffHistory',JSON.stringify(tariffHistory));
+    if($('tariffReasonV412'))$('tariffReasonV412').value='';
+    renderTariffHistoryV412();
+    if(typeof sharedCloudBackup==='function')sharedCloudBackup(false).catch(()=>{});
+  }
+  return result;
+};
+
+const backupDataV412Base=backupData;
+backupData=function(){
+  download(new Blob([JSON.stringify({jobs,settings,costs,addressOverrides,auditLogs,tariffHistory,version:APP_VERSION_V412},null,2)],{type:'application/json'}),`Sauvegarde_parage_V4_0_12_${today()}.json`);
+  logActionV4?.('Synchronisation','Sauvegarde manuelle exportée',null,'V4.0.12');
+};
+const sharedPayloadV412Base=sharedPayload;
+sharedPayload=function(){return Object.assign({},sharedPayloadV412Base(),{tariffHistory,version:APP_VERSION_V412});};
+
+function updateV412Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.12');
+  document.title='Suivi Parage v4.0.12';
+  tariffHistoryPanelV412();installPaymentRuleV412();
+}
+const showViewV412Base=showView;
+showView=function(viewId){const r=showViewV412Base(viewId);if(viewId==='settings')tariffHistoryPanelV412();if(viewId==='chantier')installPaymentRuleV412();return r;};
+const enterApplicationV412Base=enterApplication;
+enterApplication=async function(){
+  const r=await enterApplicationV412Base();
+  migrateFinishedPricingV412();updateV412Identity();renderHome();renderAccounting();
+  return r;
+};
+setTimeout(()=>{migrateFinishedPricingV412();updateV412Identity();},5200);

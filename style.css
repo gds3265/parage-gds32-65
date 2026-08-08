@@ -128,3 +128,6 @@ body.mode-terrain #nav button{font-size:15px;padding:12px 18px}
 .accountingSnapshotV406 p{margin:4px 0 0}
 .accountingSnapshotV406 table{min-width:940px}
 .accountingSnapshotV406 .lateRow{background:#fff0f0}
+
+/* V4.0.12 */
+#tariffHistoryV412 table{min-width:900px}#tariffChangeMetaV412{border-left:4px solid var(--accent)}
