@@ -3616,7 +3616,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.16',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.17',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3673,3 +3673,67 @@ const initV416Base=init;
 init=async function(){const r=await initV416Base();updateV416Identity();return r;};
 setTimeout(updateV416Identity,0);
 setTimeout(updateV416Identity,1200);
+
+/* =====================================================================
+   V4.0.17 — correctif tarifs >= 2 bovins + modification chantier validé
+   - >=2 bovins : paire 15 € HT, pied seul 7,50 € HT (migration des anciens
+     réglages 20/10 issus des versions précédentes).
+   - Une modification manuelle de tarif prime sur le tarif figé du chantier,
+     recalcule immédiatement et est enregistrée sans repasser un chantier
+     déjà validé en brouillon.
+   ===================================================================== */
+const APP_VERSION_V417='4.0.17';
+
+(function migrateManyRatesV417(){
+  if(localStorage.getItem('parage.ratesMigrationV417'))return;
+  if(+settings.pairMany===20)settings.pairMany=15;
+  if(+settings.footMany===10)settings.footMany=7.5;
+  localStorage.setItem('parage.settings',JSON.stringify(settings));
+  localStorage.setItem('parage.ratesMigrationV417',new Date().toISOString());
+})();
+
+function calcV417(job=current){
+  if(job?.importedHistory)return calcV416Previous(job);
+  const animals=(job?.animals||[]).map(syncLegacyAnimal), populated=animals.filter(a=>hasAnimalContent(a)), n=populated.length;
+  let pairs=0,single=0,band=0,blocks=0;
+  for(const animal of populated){
+    ensureWorkedFeet(animal);const worked=new Set(animal.workedFeet||[]);let pairedFeet=0;
+    if(worked.has('PAvG')&&worked.has('PAvD')){pairs++;pairedFeet+=2;}
+    if(worked.has('PArG')&&worked.has('PArD')){pairs++;pairedFeet+=2;}
+    single+=Math.max(0,worked.size-pairedFeet);
+    for(const d of Object.values(animal.claws||{})){if((d.care||[]).includes('Pansement'))band++;if((d.care||[]).includes('Talonnette'))blocks++;}
+  }
+  const p=job?.lockedPricingV412&&!job?.importedHistory?job.lockedPricingV412:null;
+  // Une saisie manuelle explicite doit toujours primer sur le snapshot historique.
+  const pairRate=job?.customPairRate!=null ? +job.customPairRate : (p?(+p.pairRate||0):(n<=1?+settings.pairOne:+settings.pairMany));
+  const footRate=job?.customFootRate!=null ? +job.customFootRate : (p?(+p.footRate||0):(n<=1?+settings.footOne:+settings.footMany));
+  const bandageRate=job?.customBandageRate!=null ? +job.customBandageRate : (p?(+p.bandageRate||0):+settings.bandagePrice);
+  const blockRate=job?.customBlockRate!=null ? +job.customBlockRate : (p?(+p.blockRate||0):+settings.blockPrice);
+  const fee=+job?.fee||0, vat=p?(+p.vat||0):(+settings.vat||0);
+  const careTotal=pairs*pairRate+single*footRate+band*bandageRate+blocks*blockRate,ht=fee+careTotal,ttc=ht*(1+vat/100);
+  return {n,pairs,single,band,blocks,careTotal,ht,ttc,pairRate,footRate,bandageRate,blockRate,fee,vat,lockedPricing:!!p};
+}
+calc=calcV417;
+
+// Ne jamais dégrader un chantier déjà validé lors d'une sauvegarde automatique.
+const saveDraftSilentlyV417Base=saveDraftSilently;
+saveDraftSilently=function(){
+  const stored=jobs.find(x=>x.id===current?.id);
+  if(stored?.status==='finished'&&current)current.status='finished';
+  return saveDraftSilentlyV417Base();
+};
+
+// Les tarifs saisis à la main sont sauvegardés et recalculés immédiatement.
+document.addEventListener('input',e=>{
+  if(!current)return;
+  const map={jobPairRate:'customPairRate',jobFootRate:'customFootRate',jobBandageRate:'customBandageRate',jobBlockRate:'customBlockRate'};
+  const key=map[e.target.id];if(!key)return;
+  current[key]=e.target.value===''?null:+e.target.value;
+  const stored=jobs.find(x=>x.id===current.id);if(stored?.status==='finished')current.status='finished';
+  const i=jobs.findIndex(x=>x.id===current.id);if(i>=0)jobs[i]=JSON.parse(JSON.stringify(current));
+  saveAll();renderTotals();
+});
+
+function updateV417Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.17');document.title='Suivi Parage v4.0.17';}
+const initV417Base=init;init=async function(){const r=await initV417Base();updateV417Identity();return r;};
+setTimeout(updateV417Identity,0);setTimeout(updateV417Identity,1200);
