@@ -3616,4 +3616,60 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.15',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.16',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+
+/* =====================================================================
+   V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
+   - Une paire = les 2 antérieurs OU les 2 postérieurs, jamais 2 pieds quelconques.
+   - Les chantiers figés conservent les TARIFS historiques, mais leurs montants
+     se recalculent si le contenu du chantier est corrigé/modifié.
+   ===================================================================== */
+const APP_VERSION_V416='4.0.16';
+
+function calcV416(job=current){
+  const animals=(job?.animals||[]).map(syncLegacyAnimal);
+  const populatedAnimals=animals.filter(a=>hasAnimalContent(a));
+  const n=populatedAnimals.length;
+  let pairs=0,single=0,band=0,blocks=0;
+
+  for(const animal of populatedAnimals){
+    ensureWorkedFeet(animal);
+    const worked=new Set(animal.workedFeet||[]);
+    let pairedFeet=0;
+    if(worked.has('PAvG')&&worked.has('PAvD')){pairs++;pairedFeet+=2;}
+    if(worked.has('PArG')&&worked.has('PArD')){pairs++;pairedFeet+=2;}
+    single+=Math.max(0,worked.size-pairedFeet);
+
+    for(const d of Object.values(animal.claws||{})){
+      if((d.care||[]).includes('Pansement'))band++;
+      if((d.care||[]).includes('Talonnette'))blocks++;
+    }
+  }
+
+  const p=job?.lockedPricingV412&&!job?.importedHistory ? job.lockedPricingV412 : null;
+  const pairRate=p ? (+p.pairRate||0) : (job?.customPairRate ?? (n<=1?settings.pairOne:settings.pairMany));
+  const footRate=p ? (+p.footRate||0) : (job?.customFootRate ?? (n<=1?settings.footOne:settings.footMany));
+  const bandageRate=p ? (+p.bandageRate||0) : (job?.customBandageRate ?? settings.bandagePrice);
+  const blockRate=p ? (+p.blockRate||0) : (job?.customBlockRate ?? settings.blockPrice);
+  const fee=p ? (+p.fee||0) : (+job?.fee||0);
+  const vat=p ? (+p.vat||0) : (+settings.vat||0);
+  const careTotal=pairs*pairRate+single*footRate+band*bandageRate+blocks*blockRate;
+  const ht=fee+careTotal;
+  const ttc=ht*(1+vat/100);
+  return {n,pairs,single,band,blocks,careTotal,ht,ttc,pairRate,footRate,bandageRate,blockRate,fee,vat,lockedPricing:!!p};
+}
+
+const calcV416Previous=calc;
+calc=function(job=current){
+  if(job?.importedHistory)return calcV416Previous(job);
+  return calcV416(job);
+};
+
+function updateV416Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.16');
+  document.title='Suivi Parage v4.0.16';
+}
+const initV416Base=init;
+init=async function(){const r=await initV416Base();updateV416Identity();return r;};
+setTimeout(updateV416Identity,0);
+setTimeout(updateV416Identity,1200);
