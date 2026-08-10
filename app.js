@@ -3737,3 +3737,97 @@ document.addEventListener('input',e=>{
 function updateV417Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.17');document.title='Suivi Parage v4.0.17';}
 const initV417Base=init;init=async function(){const r=await initV417Base();updateV417Identity();return r;};
 setTimeout(updateV417Identity,0);setTimeout(updateV417Identity,1200);
+
+/* =====================================================================
+   V4.0.18 — saisie décimale des tarifs + persistance des modifications
+   - Empêche renderTotals() de réécrire le champ tarif en cours de saisie.
+   - Accepte 7,5 comme 7.5 sur les champs tarifaires.
+   - Enregistre immédiatement le tarif personnalisé sur le chantier ouvert.
+   - Un chantier validé reste validé et son snapshot tarifaire est actualisé.
+   ===================================================================== */
+const APP_VERSION_V418='4.0.18';
+
+function decimalValueV418(v){
+  const s=String(v??'').trim().replace(',','.');
+  if(s==='')return null;
+  const n=Number(s);
+  return Number.isFinite(n)?n:null;
+}
+
+const rateFieldMapV418={
+  jobPairRate:'customPairRate',
+  jobFootRate:'customFootRate',
+  jobBandageRate:'customBandageRate',
+  jobBlockRate:'customBlockRate'
+};
+
+// Ne pas écraser le champ que l'utilisateur est précisément en train de modifier.
+const renderTotalsV418Base=renderTotals;
+renderTotals=function(){
+  const active=document.activeElement;
+  const keep=active&&rateFieldMapV418[active.id] ? {el:active,value:active.value,selStart:active.selectionStart,selEnd:active.selectionEnd} : null;
+  const r=renderTotalsV418Base();
+  if(keep&&document.body.contains(keep.el)){
+    keep.el.value=keep.value;
+    try{keep.el.setSelectionRange(keep.selStart,keep.selEnd);}catch(e){}
+  }
+  return r;
+};
+
+function persistRateEditV418(input){
+  if(!current||!input||!rateFieldMapV418[input.id])return;
+  const value=decimalValueV418(input.value);
+  if(value===null)return; // laisser l'utilisateur finir sa saisie
+  const key=rateFieldMapV418[input.id];
+  current[key]=value;
+
+  // Si le chantier était déjà validé, conserver ce statut et mettre à jour
+  // le snapshot tarifaire pour que la modification reste vraie après réouverture.
+  const stored=jobs.find(x=>x.id===current.id);
+  if(stored?.status==='finished'||current.status==='finished')current.status='finished';
+  if(current.lockedPricingV412&&!current.importedHistory){
+    const c=calcV417(current);
+    current.lockedPricingV412={
+      ...current.lockedPricingV412,
+      at:new Date().toISOString(),
+      fee:+current.fee||0,
+      vat:+c.vat||0,
+      pairRate:+c.pairRate||0,
+      footRate:+c.footRate||0,
+      bandageRate:+c.bandageRate||0,
+      blockRate:+c.blockRate||0,
+      careTotal:+c.careTotal||0,
+      ht:+c.ht||0,
+      ttc:+c.ttc||0
+    };
+  }
+  const i=jobs.findIndex(x=>x.id===current.id);
+  if(i>=0)jobs[i]=JSON.parse(JSON.stringify(current));
+  saveAll();
+  renderTotals();
+}
+
+// Capture après les anciens handlers : corrige notamment la saisie française "7,5".
+document.addEventListener('input',e=>{
+  if(rateFieldMapV418[e.target?.id])persistRateEditV418(e.target);
+});
+document.addEventListener('change',e=>{
+  if(rateFieldMapV418[e.target?.id]){
+    persistRateEditV418(e.target);
+    const v=decimalValueV418(e.target.value);
+    if(v!==null)e.target.value=String(v).replace('.',',');
+  }
+});
+
+// Valeurs par défaut correctes pour les chantiers de 2 bovins ou plus.
+if(+settings.pairMany===20)settings.pairMany=15;
+if(+settings.footMany===10)settings.footMany=7.5;
+localStorage.setItem('parage.settings',JSON.stringify(settings));
+
+function updateV418Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.18');
+  document.title='Suivi Parage v4.0.18';
+}
+const initV418Base=init;
+init=async function(){const r=await initV418Base();updateV418Identity();return r;};
+setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(updateV418Identity,6500);
