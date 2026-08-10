@@ -131,3 +131,6 @@ body.mode-terrain #nav button{font-size:15px;padding:12px 18px}
 
 /* V4.0.12 */
 #tariffHistoryV412 table{min-width:900px}#tariffChangeMetaV412{border-left:4px solid var(--accent)}
+
+/* V4.0.13 */
+.accountingComptaComment{margin-top:7px;padding:7px 9px;border-radius:8px;background:#fff4f8;border:1px solid #ecc7d8;line-height:1.35;white-space:normal}

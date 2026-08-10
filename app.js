@@ -139,6 +139,7 @@ function blankJob() {
     paymentMethod: '',
     customPairRate: null, customFootRate: null, customBandageRate: null, customBlockRate: null,
     comment: '',
+    accountingComment: '',
     animals: [],
     status: 'draft',
     exportedAt: null,
@@ -189,7 +190,7 @@ function fillJob() {
   [
     ['cheptel', 'cheptel'], ['clientName', 'clientName'], ['address', 'address'], ['cpVille', 'cpVille'],
     ['department', 'department'], ['race', 'race'], ['jobDate', 'date'], ['startTime', 'start'],
-    ['endTime', 'end'], ['paymentTiming','paymentTiming'], ['paymentMethod','paymentMethod'], ['fee', 'fee'], ['jobComment', 'comment']
+    ['endTime', 'end'], ['paymentTiming','paymentTiming'], ['paymentMethod','paymentMethod'], ['fee', 'fee'], ['jobComment', 'comment'], ['accountingComment','accountingComment']
   ].forEach(([id, key]) => { const el=$(id); if(el) el.value = current[key] ?? ''; });
   current.animals = (current.animals || []).map(syncLegacyAnimal);
   renderAnimals();
@@ -202,7 +203,7 @@ function syncJob() {
   [
     ['cheptel', 'cheptel'], ['clientName', 'clientName'], ['address', 'address'], ['cpVille', 'cpVille'],
     ['department', 'department'], ['race', 'race'], ['jobDate', 'date'], ['startTime', 'start'],
-    ['endTime', 'end'], ['paymentTiming','paymentTiming'], ['paymentMethod','paymentMethod'], ['fee', 'fee'], ['jobComment', 'comment']
+    ['endTime', 'end'], ['paymentTiming','paymentTiming'], ['paymentMethod','paymentMethod'], ['fee', 'fee'], ['jobComment', 'comment'], ['accountingComment','accountingComment']
   ].forEach(([id, key]) => { const el=$(id); if(el) current[key] = el.value; });
   current.fee = +current.fee || 0;
 }
@@ -550,7 +551,7 @@ function exportAccounting() {
   for (const j of rows) {
     const c = calc(j);
     const month = j.date.slice(0, 7) + '-01';
-    const comments = [j.comment, ...(j.animals || []).filter(a => a.checkNext).map(a => `À revoir ${a.number}`)].filter(Boolean).join(' | ');
+    const comments = [j.comment, j.accountingComment ? `COMPTA : ${j.accountingComment}` : '', ...(j.animals || []).filter(a => a.checkNext).map(a => `À revoir ${a.number}`)].filter(Boolean).join(' | ');
     xml += xmlRow([month, j.date, j.cheptel, j.clientName, j.address, j.cpVille, j.race, ((j.animals||[]).some(a=>a.category==='T')?'oui':'non'), j.department, j.fee, c.n, c.pairs, c.single, c.band, c.blocks, c.careTotal, c.ht, c.ttc, comments, j.date, '', '', `${j.paymentTiming||''} - ${j.paymentMethod||''}`]);
   }
   xml += '</Table></Worksheet></Workbook>';
@@ -713,7 +714,7 @@ function printSelectedProformas() {
 function buildAccountingXml(rows) {
   const headers = ['mois intervention','Date','Cheptel','Nom PRENOM','Adresse','CP + VILLE','Race','taureau fait  ?','DEPARTEMENT','FORFAIT + MISE EN PLACE','NBR Animaux totaux','NBR DE PAIRE','PIED à l\'unité','NBR DE PANSEMENT','NBR DE TALONNETTE','MONTANT SOIN TOTAUX','PRIX HT','PRIX TTC','Commentaires','Devis','FACTURE LE','Réglé le','TYPE'];
   let xml=`<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="saisie"><Table>${xmlRow(headers)}`;
-  for(const j of rows){const c=calc(j),month=j.date.slice(0,7)+'-01',comments=[j.comment,...(j.animals||[]).filter(a=>a.checkNext).map(a=>`À revoir ${a.number}`)].filter(Boolean).join(' | ');xml+=xmlRow([month,j.date,j.cheptel,j.clientName,j.address,j.cpVille,j.race,((j.animals||[]).some(a=>a.category==='T')?'oui':'non'),j.department,j.fee,c.n,c.pairs,c.single,c.band,c.blocks,c.careTotal,c.ht,c.ttc,comments,j.date,'','',`${j.paymentTiming||''} - ${j.paymentMethod||''}`]);}
+  for(const j of rows){const c=calc(j),month=j.date.slice(0,7)+'-01',comments=[j.comment,j.accountingComment?`COMPTA : ${j.accountingComment}`:'',...(j.animals||[]).filter(a=>a.checkNext).map(a=>`À revoir ${a.number}`)].filter(Boolean).join(' | ');xml+=xmlRow([month,j.date,j.cheptel,j.clientName,j.address,j.cpVille,j.race,((j.animals||[]).some(a=>a.category==='T')?'oui':'non'),j.department,j.fee,c.n,c.pairs,c.single,c.band,c.blocks,c.careTotal,c.ht,c.ttc,comments,j.date,'','',`${j.paymentTiming||''} - ${j.paymentMethod||''}`]);}
   return xml+'</Table></Worksheet></Workbook>';
 }
 
@@ -3231,3 +3232,151 @@ enterApplication=async function(){
   return r;
 };
 setTimeout(()=>{migrateFinishedPricingV412();updateV412Identity();},5200);
+
+
+/* =====================================================================
+   V4.0.13 — synchronisation sans perte + corbeille fiable + commentaire compta
+   ===================================================================== */
+const APP_VERSION_V413='4.0.13';
+let deletedJobsV413=JSON.parse(localStorage.getItem('parage.deletedJobsV413')||'{}');
+
+function touchJobV413(job){
+  if(job) job.updatedAt=new Date().toISOString();
+  return job;
+}
+function jobStampV413(j){
+  const raw=j?.updatedAt||j?.trashedAt||j?.cancelledAt||j?.paidAt||j?.accountingSentAt||j?.createdAt||'';
+  const n=Date.parse(raw); return Number.isFinite(n)?n:0;
+}
+function mergeJobsV413(localRows=[],cloudRows=[]){
+  const map=new Map();
+  for(const j of cloudRows||[]) if(j?.id&&!deletedJobsV413[j.id]) map.set(j.id,j);
+  for(const j of localRows||[]){
+    if(!j?.id||deletedJobsV413[j.id]) continue;
+    const old=map.get(j.id);
+    if(!old || jobStampV413(j)>=jobStampV413(old)) map.set(j.id,j);
+  }
+  return [...map.values()];
+}
+function mergeByIdV413(a=[],b=[]){
+  const m=new Map();for(const x of [...(a||[]),...(b||[])]) if(x?.id&&!m.has(x.id))m.set(x.id,x);return [...m.values()];
+}
+function persistDeletedJobsV413(){localStorage.setItem('parage.deletedJobsV413',JSON.stringify(deletedJobsV413));}
+
+/* Toute sauvegarde de brouillon ou de chantier reçoit une date de modification. */
+const saveDraftSilentlyV413Base=saveDraftSilently;
+saveDraftSilently=function(){touchJobV413(current);return saveDraftSilentlyV413Base();};
+const saveJobV413Base=saveJob;
+saveJob=function(){touchJobV413(current);return saveJobV413Base();};
+
+/* Les changements d'état restent eux aussi prioritaires lors de la fusion cloud. */
+const moveJobToTrashV413Base=moveJobToTrashV331;
+moveJobToTrashV331=function(id){const j=jobs.find(x=>x.id===id);if(j)touchJobV413(j);return moveJobToTrashV413Base(id);};
+const restoreFromTrashV413Base=restoreFromTrashV331;
+restoreFromTrashV331=function(id){const j=jobs.find(x=>x.id===id);if(j)touchJobV413(j);return restoreFromTrashV413Base(id);};
+const cancelValidatedJobV413Base=cancelValidatedJobV331;
+cancelValidatedJobV331=function(id){const j=jobs.find(x=>x.id===id);if(j)touchJobV413(j);return cancelValidatedJobV413Base(id);};
+const restoreCancelledJobV413Base=restoreCancelledJobV331;
+restoreCancelledJobV331=function(id){const j=jobs.find(x=>x.id===id);if(j)touchJobV413(j);return restoreCancelledJobV413Base(id);};
+
+/* Une suppression définitive crée une "pierre tombale" synchronisée pour empêcher le cloud de ressusciter le dossier. */
+permanentlyDeleteJobV331=function(id){
+  if(!isAdmin())return toast('Suppression définitive réservée à l’administratrice');
+  const j=jobs.find(x=>x.id===id);if(!j)return;
+  if(!confirm('ATTENTION : suppression définitive et irréversible. Continuer ?'))return;
+  if(!confirm(`Confirmer une seconde fois la suppression du chantier ${j.cheptel||''} du ${fmtDate(j.date)} ?`))return;
+  deletedJobsV413[id]=new Date().toISOString();persistDeletedJobsV413();
+  jobs=jobs.filter(x=>x.id!==id);persistJobsV331('Chantier supprimé définitivement');
+};
+purgeExpiredTrashV331=function(){
+  if(!isAdmin())return;
+  const limit=Date.now()-30*24*60*60*1000;let changed=false;
+  jobs=jobs.filter(j=>{
+    const expired=j.status==='trashed'&&j.trashedAt&&new Date(j.trashedAt).getTime()<limit;
+    if(expired){deletedJobsV413[j.id]=new Date().toISOString();changed=true;return false;}return true;
+  });
+  if(changed){persistDeletedJobsV413();persistJobsV331();}
+};
+
+/* Le commentaire destiné à la comptabilité est affiché clairement dans chaque dossier. */
+const accountingRowDetailsV413Base=accountingRowDetailsV404;
+accountingRowDetailsV404=function(job){
+  const base=accountingRowDetailsV413Base(job);
+  const note=String(job?.accountingComment||'').trim();
+  return base+(note?`<div class="accountingComptaComment"><b>💬 Commentaire compta :</b> ${nl2br(note)}</div>`:'');
+};
+
+/* Une mise à jour comptable doit être datée pour ne pas être écrasée par un autre appareil. */
+const updateAccountingJobV413Base=updateAccountingJob;
+updateAccountingJob=function(id,key,value){const j=jobs.find(x=>x.id===id);if(j)touchJobV413(j);return updateAccountingJobV413Base(id,key,value);};
+const setAccountingStatusV413Base=setAccountingStatus;
+setAccountingStatus=function(id,status){const j=jobs.find(x=>x.id===id);if(j)touchJobV413(j);return setAccountingStatusV413Base(id,status);};
+
+/* Payload partagé enrichi avec les suppressions définitives. */
+const sharedPayloadV413Base=sharedPayload;
+sharedPayload=function(){return Object.assign({},sharedPayloadV413Base(),{deletedJobsV413,version:APP_VERSION_V413});};
+
+/* Restauration cloud = FUSION, jamais remplacement brutal de la liste locale. */
+sharedCloudRestore=async function(silent=false){
+  if(!authSession||!navigator.onLine)return false;
+  const c=cloudConfig();
+  try{
+    const r=await fetch(`${c.url}/rest/v1/parage_backups?id=eq.suivi-parage-main&select=payload,updated_at`,{headers:authHeaders()});
+    if(r.status===401&&await refreshAuthSession())return sharedCloudRestore(silent);
+    if(!r.ok)throw new Error(await r.text());
+    const rows=await r.json();
+    if(!rows.length){if(canEditJobs()||canEditAccounting())await sharedCloudBackup(false);return true;}
+    const p=rows[0].payload||{};
+    if(p.deletedJobsV413&&typeof p.deletedJobsV413==='object'){
+      for(const [id,at] of Object.entries(p.deletedJobsV413)){
+        if(!deletedJobsV413[id]||String(at)>String(deletedJobsV413[id]))deletedJobsV413[id]=at;
+      }
+      persistDeletedJobsV413();
+    }
+    jobs=mergeJobsV413(jobs,p.jobs||[]).filter(j=>!deletedJobsV413[j.id]);
+    costs=Object.assign({},p.costs||{},costs||{});
+    addressOverrides=Object.assign({},p.addressOverrides||{},addressOverrides||{});
+    importedClients=mergeClientBases(p.importedClients||[],importedClients||[]);
+    if(Array.isArray(p.tariffHistory)){tariffHistory=mergeByIdV413(tariffHistory,p.tariffHistory);localStorage.setItem('parage.tariffHistory',JSON.stringify(tariffHistory));}
+    if(Array.isArray(p.auditLogs)&&typeof auditLogs!=='undefined') auditLogs=mergeByIdV413(auditLogs,p.auditLogs);
+    const localCloud={supabaseUrl:settings.supabaseUrl,supabaseKey:settings.supabaseKey,accountingEmail:settings.accountingEmail};
+    settings=Object.assign(settings,p.settings||{},localCloud);
+    originalSaveAllV3();
+    localStorage.setItem('parage.costs',JSON.stringify(costs));
+    localStorage.setItem('parage.addressOverrides',JSON.stringify(addressOverrides));
+    localStorage.setItem('parage.importedClients',JSON.stringify(importedClients));
+    localStorage.setItem('parage.settings',JSON.stringify(settings));
+    loadSettings();renderHome();renderHistory();renderAccounting();
+    if(!silent)toast('Données locales et cloud fusionnées sans perte');
+    return true;
+  }catch(e){if(!silent)toast('Lecture cloud impossible — données locales conservées');return false;}
+};
+cloudRestore=()=>sharedCloudRestore(false);
+
+/* Au retour réseau, on fusionne d'abord puis on renvoie l'ensemble fusionné. */
+window.addEventListener('online',()=>{updateSyncBadge();sharedCloudRestore(true).then(()=>sharedCloudBackup(false));});
+
+function updateV413Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.13');
+  document.title='Suivi Parage v4.0.13';
+}
+const enterApplicationV413Base=enterApplication;
+enterApplication=async function(){const r=await enterApplicationV413Base();updateV413Identity();renderHome();renderHistory();renderAccounting();return r;};
+setTimeout(()=>{updateV413Identity();},5600);
+
+/* V4.0.13 correctif complémentaire : abandon = corbeille, jamais suppression silencieuse. */
+cancelCurrentJob=function(){
+  if(!current){current=blankJob();chantierStarted=false;updateChantierUI();showView('home');return;}
+  syncJob();
+  const hasData=!!(current.cheptel||(current.animals||[]).some(hasAnimalContent)||String(current.comment||'').trim()||String(current.accountingComment||'').trim());
+  if(hasData&&!confirm('Abandonner ce chantier en cours ?\n\nIl sera placé dans la corbeille et pourra être restauré pendant 30 jours.'))return;
+  if(hasData){
+    let j=jobs.find(x=>x.id===current.id);
+    if(!j){j=JSON.parse(JSON.stringify(current));jobs.push(j);}
+    else Object.assign(j,JSON.parse(JSON.stringify(current)));
+    j.previousStatus=j.status||'draft';j.status='trashed';j.trashedAt=new Date().toISOString();touchJobV413(j);
+    saveAll();if(typeof sharedCloudBackup==='function')sharedCloudBackup(false).catch(()=>{});
+  }
+  current=blankJob();chantierStarted=false;updateChantierUI();showView('home');
+  toast(hasData?'Chantier placé dans la corbeille':'Chantier abandonné');
+};
