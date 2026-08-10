@@ -134,3 +134,6 @@ body.mode-terrain #nav button{font-size:15px;padding:12px 18px}
 
 /* V4.0.13 */
 .accountingComptaComment{margin-top:7px;padding:7px 9px;border-radius:8px;background:#fff4f8;border:1px solid #ecc7d8;line-height:1.35;white-space:normal}
+
+/* V4.0.15 */
+.clientLookupV415{grid-column:1/-1;border:1px solid #ecc3d8;background:#fff8fb;border-radius:12px;padding:10px;margin:-2px 0 4px}.clientLookupV415 label{margin:0}.clientSearchResultsV415{display:grid;gap:6px;margin-top:8px;max-height:300px;overflow:auto}.clientSearchResultsV415[hidden]{display:none}.clientSearchResultsV415 button{text-align:left;display:flex;flex-direction:column;gap:2px;padding:9px 11px;background:#fff;border:1px solid #e5b1cc;border-radius:10px}.clientSearchResultsV415 button span{font-size:.85em;color:#6b5661}.clientSearchResultsV415 p{margin:4px 0;color:#6b5661}.footDermatitis{width:100%;margin:6px 0 8px;border:1px solid #d38bae;background:#fff7fb;color:#812b55;font-weight:700}.footDermatitis.on{background:#f7c9df;border-color:#b83278;color:#6f1943}

@@ -2936,6 +2936,9 @@ function makeProformaPdfV411(job){
       if((d.issues||[]).length)probs.push(`${k}: ${(d.issues||[]).join(', ')}`);
       for(const x of (d.care||[])) if(x==='Pansement'||x==='Talonnette') soins.add(x);
     }
+    for(const code of Object.keys(a.footIssues||{})){
+      if((a.footIssues[code]||[]).includes('Dermatite')) probs.push(`${fl[code]||code}: Dermatite (entre les onglons)`);
+    }
     const vals=[a.number||'-',categoryLabels[a.category]||a.category||'-',(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')||'-',probs.join('; ')||'RAS',[...soins].join(', ')||'-'];
     const wrapped=vals.map((v,i)=>pdfWrap311(v,[8,11,28,24,16][i]));
     const lines=Math.max(...wrapped.map(v=>v.length),1);
@@ -2970,7 +2973,7 @@ function makeProformaPdfV411(job){
 
     if(page.first){
       cmds.push('q 185 0 0 53 34 779 cm /Im1 Do Q');
-      text(300,807,11.5,'PRO FORMA / COMPTE RENDU DE PARAGE',true);
+      text(250,807,9.5,`PRO FORMA / COMPTE RENDU - ${(job.clientName||'').slice(0,28)}`,true);
       line(margin,772,pageW-margin,772,1.2);
       rect(margin,692,250,64); rect(310,692,251,64);
       text(44,740,9,'GDS Gers Hautes-Pyrenees',true);
@@ -3507,3 +3510,110 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js?v=4.0.14',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
+
+
+/* =====================================================================
+   V4.0.15 : recherche éleveur + dermatite au pied + nom éleveur pro forma
+   ===================================================================== */
+const APP_VERSION_V415='4.0.15';
+
+function normalizeSearchV415(v){
+  return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+}
+function safeFilenameV415(v){
+  return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,55)||'eleveur';
+}
+function proformaFilenameV415(job){
+  return `Proforma_${safeFilenameV415(job?.clientName||'Eleveur')}_${safeFilenameV415(job?.cheptel||'sans_cheptel')}_${job?.date||today()}.pdf`;
+}
+
+/* Dermatite : lésion interdigitée, enregistrée au niveau du pied et non d'un onglon. */
+const syncLegacyAnimalV415Base=syncLegacyAnimal;
+syncLegacyAnimal=function(a){
+  a=syncLegacyAnimalV415Base(a); if(!a)return a;
+  if(!a.footIssues||typeof a.footIssues!=='object')a.footIssues={};
+  for(const [key,d] of Object.entries(a.claws||{})){
+    if(!Array.isArray(d?.issues)||!d.issues.includes('Dermatite'))continue;
+    const code=key.split('-')[0];
+    a.footIssues[code]=Array.from(new Set([...(a.footIssues[code]||[]),'Dermatite']));
+    d.issues=d.issues.filter(x=>x!=='Dermatite');
+    if(!d.issues.length&&!d.care?.length&&!String(d.note||'').trim())delete a.claws[key];
+  }
+  return a;
+};
+function hasFootDermatitisV415(animal,code){return !!(animal?.footIssues?.[code]||[]).includes('Dermatite');}
+function toggleFootDermatitisV415(animalId,code){
+  const animal=current.animals.find(x=>x.id===animalId);if(!animal)return;
+  syncLegacyAnimal(animal);const list=new Set(animal.footIssues[code]||[]);
+  if(list.has('Dermatite'))list.delete('Dermatite');else list.add('Dermatite');
+  if(list.size)animal.footIssues[code]=[...list];else delete animal.footIssues[code];
+  ensureWorkedFeet(animal);if(!animal.workedFeet.includes(code))animal.workedFeet.push(code);
+  saveDraftSilently();renderAnimals();
+}
+
+footHTML=function(animal,code,label){
+  syncLegacyAnimal(animal);ensureWorkedFeet(animal);
+  const worked=animal.workedFeet.includes(code),photos=footPhotosV4(animal,code),previous=previousFootInfoV4(animal,code),derm=hasFootDermatitisV415(animal,code);
+  const previousIcons=previous?`${previous.photo?'📷 ':''}${previous.bandage?'🩹 ':''}${previous.block?'◼️ ':''}`:'';
+  return `<div class="foot ${worked?'worked':''} ${previous?'previousFoot':''}"><h4>${label}${previous?` <span class="previousFootMark" title="Pied traité le ${fmtDate(previous.date)}">↶ ${fmtDate(previous.date)} ${previousIcons}</span>`:''}</h4><button class="footDone ${worked?'on':''}" onclick="toggleFoot('${animal.id}','${code}')">${worked?'✓ Pied fait':'Marquer le pied fait'}</button><button type="button" class="footDermatitis ${derm?'on':''}" onclick="toggleFootDermatitisV415('${animal.id}','${code}')">${derm?'✓ Dermatite':'Dermatite entre les onglons'}</button><div class="claws">${['Int','Ext'].map(side=>{const key=code+'-'+side,d=animal.claws[key]||{},cls=(d.issues?.length||d.care?.length)?'problem':'';return `<button class="claw ${cls}" onclick="editClaw('${animal.id}','${key}')"><b>${side==='Int'?'Interne':'Externe'}</b><br><small>${[...(d.issues||[]),...(d.care||[])].slice(0,2).join(', ')||'Autre problème / soin'}</small></button>`;}).join('')}</div><div class="footPhotoBar"><button type="button" class="photoBtn" onclick="addFootPhotoV4('${animal.id}','${code}')">📷 Photo du pied</button>${photos.length?`<span class="photoCount">${photos.length} photo${photos.length>1?'s':''}</span>`:''}</div><div class="footPhotos">${photos.map(p=>`<div class="footPhoto"><img src="${p.data}" alt="Photo du pied" onclick="openFootPhotoV4('${animal.id}','${code}','${p.id}')"><button type="button" title="Supprimer" onclick="event.stopPropagation();removeFootPhotoV4('${animal.id}','${code}','${p.id}')">×</button></div>`).join('')}</div></div>`;
+};
+
+editClaw=function(animalId,key){
+  const animal=current.animals.find(x=>x.id===animalId);if(!animal)return;syncLegacyAnimal(animal);
+  const d=animal.claws[key]||{touched:true,issues:[],care:[],note:''};
+  const overlay=document.createElement('div');overlay.className='detailBox';overlay.style.position='fixed';overlay.style.inset='10% 5%';overlay.style.zIndex=20;overlay.style.overflow='auto';overlay.style.boxShadow='0 0 0 9999px #0008';
+  const clawIssues=issues.filter(x=>x!=='Dermatite');
+  overlay.innerHTML=`<div class="toolbar"><h3>${key}</h3><button id="closeTop">✕</button></div><p class="hint">Pour une dermatite, utilisez directement le bouton « Dermatite entre les onglons » du pied concerné.</p><h4>Problèmes de l'onglon</h4><div class="chips">${clawIssues.map(x=>`<button class="chip ${(d.issues||[]).includes(x)?'on':''}" data-type="issue" data-val="${x}">${x}</button>`).join('')}</div><h4>Soins</h4><div class="chips">${care.map(x=>`<button class="chip ${(d.care||[]).includes(x)?'on':''}" data-type="care" data-val="${x}">${x}</button>`).join('')}</div><label>Commentaire<input id="clawNote" value="${esc(d.note||'')}"></label><div class="actions"><button id="clearDetail">Effacer</button><button class="primary" id="closeDetail">Fermer</button></div>`;
+  document.body.appendChild(overlay);
+  const persist=()=>{animal.claws[key]={touched:true,issues:[...overlay.querySelectorAll('[data-type=issue].on')].map(x=>x.dataset.val),care:[...overlay.querySelectorAll('[data-type=care].on')].map(x=>x.dataset.val),note:overlay.querySelector('#clawNote').value};if(animal.claws[key].care.includes('À revoir'))animal.checkNext=true;const footCode=key.split('-')[0];ensureWorkedFeet(animal);if(!animal.workedFeet.includes(footCode))animal.workedFeet.push(footCode);};
+  overlay.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{b.classList.toggle('on');persist();});overlay.querySelector('#clawNote').oninput=persist;
+  const close=()=>{persist();overlay.remove();saveDraftSilently();renderAnimals();};overlay.querySelector('#closeTop').onclick=close;overlay.querySelector('#closeDetail').onclick=close;overlay.querySelector('#clearDetail').onclick=()=>{delete animal.claws[key];overlay.remove();saveDraftSilently();renderAnimals();};
+};
+
+summaryAnimal=function(animal){
+  syncLegacyAnimal(animal);const arr=[];
+  for(const [k,d] of Object.entries(animal.claws||{}))if(d.issues?.length||d.care?.length)arr.push(`${k}: ${[...(d.issues||[]),...(d.care||[])].join(', ')}`);
+  const fl=Object.fromEntries(feet);for(const [code,list] of Object.entries(animal.footIssues||{}))if((list||[]).length)arr.push(`${fl[code]||code}: ${(list||[]).join(', ')}`);
+  return arr.join(' ; ')||'aucun problème signalé';
+};
+
+/* Recherche dans la base d'adresses par nom ou commune. */
+function installClientSearchV415(){
+  const cheptel=$('cheptel');if(!cheptel||$('clientLookupV415'))return;
+  const wrap=document.createElement('div');wrap.id='clientLookupV415';wrap.className='clientLookupV415';
+  wrap.innerHTML=`<label>Éleveur inconnu ? Rechercher par nom ou commune<input id="clientSearchV415" autocomplete="off" placeholder="Ex. Dupont ou Tarbes"></label><div id="clientSearchResultsV415" class="clientSearchResultsV415"></div>`;
+  cheptel.closest('label')?.insertAdjacentElement('afterend',wrap);
+  let timer;const input=$('clientSearchV415');input?.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(renderClientSearchV415,120);});
+}
+function renderClientSearchV415(){
+  const host=$('clientSearchResultsV415'),input=$('clientSearchV415');if(!host||!input)return;
+  const q=normalizeSearchV415(input.value);if(q.length<2){host.innerHTML='';host.hidden=true;return;}
+  const tokens=q.split(/\s+/).filter(Boolean);
+  const rows=(clients||[]).filter(c=>{const hay=normalizeSearchV415(`${c.nom||''} ${c.commune||''} ${c.cpVille||''} ${c.cheptel||''}`);return tokens.every(t=>hay.includes(t));}).slice(0,25);
+  host.hidden=false;host.innerHTML=rows.map((c,i)=>`<button type="button" onclick="selectClientV415(${i})" data-client-index="${i}"><b>${esc(c.nom||'Sans nom')}</b><span>${esc(c.commune||c.cpVille||'')} · Cheptel ${esc(c.cheptel||'')}</span></button>`).join('')||'<p>Aucun élevage trouvé.</p>';
+  host._rows=rows;
+}
+function selectClientV415(i){
+  const host=$('clientSearchResultsV415'),c=host?._rows?.[i];if(!c)return;
+  const corrected=addressOverrides[String(c.cheptel)]||{};const client=Object.assign({},c,corrected);
+  $('cheptel').value=client.cheptel||'';$('clientName').value=client.nom||'';$('address').value=client.adresse||'';$('cpVille').value=client.cpVille||'';$('department').value=client.departement||'';
+  if(current){current.cheptel=client.cheptel||'';current.clientName=client.nom||'';current.address=client.adresse||'';current.cpVille=client.cpVille||'';current.department=client.departement||'';}
+  if($('clientSearchV415'))$('clientSearchV415').value=`${client.nom||''} — ${client.commune||client.cpVille||''}`;host.hidden=true;renderPaymentAlert();renderAnimalsToReviewAlert();saveDraftSilently();
+}
+
+/* Nom de l'éleveur dans le nom du fichier PDF et dans le titre imprimé. */
+finishJob=async function(){
+  if(!canEditJobs())return toast('Validation reservee a la pareuse');syncJob();current.animals=current.animals.filter(a=>hasAnimalContent(a));if(!current.animals.length)return toast('Aucun bovin enregistre');current.animals.forEach(a=>{syncLegacyAnimal(a);a.done=true;a.collapsed=true;});current.end=nowTime();if($('endTime'))$('endTime').value=current.end;current.status='finished';saveAddressOverride(true);saveJob();archiveFinishedJob(current);const snapshot=JSON.parse(JSON.stringify(current)),name=proformaFilenameV415(snapshot),pdf=proformaPdfBlob(snapshot);await storeGeneratedFile(name,pdf,'proforma',snapshot.id).catch(()=>{});sharedCloudBackup(false);openPdfPreview(pdf,name,{validated:true});
+};
+printProforma=function(){syncJob();current.animals?.forEach(syncLegacyAnimal);openPdfPreview(proformaPdfBlob(current),proformaFilenameV415(current),{validated:false});};
+
+prepareAndShareAccounting=async function(){
+  const rows=selectedExportJobs();if(!rows.length)return toast('Sélectionnez les chantiers à transmettre');const day=rows[0].date||today(),files=[{name:`Export_comptable_${day}.xls`,data:buildAccountingXml(rows)}];
+  for(const j of rows){files.push({name:`Proformas/${proformaFilenameV415(j)}`,data:new Uint8Array(await proformaPdfBlob(j).arrayBuffer())});}
+  const zip=zipStore(files),name=`Compta_parage_${day}.zip`;await storeGeneratedFile(name,zip,'zip');const file=new File([zip],name,{type:'application/zip'});let shared=false;if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({title:`Parage ${fmtDate(day)}`,text:`${rows.length} chantier(s) de parage`,files:[file]});shared=true;}catch{}}else{download(zip,name);toast('ZIP enregistré dans les fichiers générés');}if(shared){rows.forEach(j=>j.exportedAt=new Date().toISOString());saveAll();renderExports();toast('ZIP partagé à la comptabilité');}
+};
+downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAndShareAccounting;
+
+function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
+const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.15',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
