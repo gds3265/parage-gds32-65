@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.22');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.23');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.22').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.23').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -3507,7 +3507,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.22',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.23',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3616,7 +3616,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.22',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.23',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3840,13 +3840,13 @@ setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(
    - Recharge automatique dès qu'un nouveau service worker prend le contrôle.
    - Aucune donnée métier/localStorage n'est effacée.
    ===================================================================== */
-const APP_VERSION_V419='4.0.22';
+const APP_VERSION_V419='4.0.23';
 let parageReloadingV419=false;
 
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.22',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.23',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -3888,8 +3888,8 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 setInterval(checkRemoteVersionV419,15*60*1000);
 
 function updateV419Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.22');
-  document.title='Suivi Parage v4.0.22';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.23');
+  document.title='Suivi Parage v4.0.23';
 }
 const initV419Base=init;
 init=async function(){const r=await initV419Base();updateV419Identity();checkRemoteVersionV419();return r;};
@@ -4040,8 +4040,45 @@ init=async function(){const r=await initV421Base();updateV421Identity();renderHo
 setTimeout(updateV421Identity,0);setTimeout(updateV421Identity,1200);setTimeout(updateV421Identity,7200);
 
 
-/* V4.0.22 — correctif boucle de rechargement PWA */
-const APP_VERSION_V422='4.0.22';
-function updateV422Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.22');document.title='Suivi Parage v4.0.22';}
+/* V4.0.23 — correctif boucle de rechargement PWA */
+const APP_VERSION_V422='4.0.23';
+function updateV422Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.23');document.title='Suivi Parage v4.0.23';}
 const initV422Base=init;init=async function(){const r=await initV422Base();updateV422Identity();return r;};
 setTimeout(updateV422Identity,0);setTimeout(updateV422Identity,1500);setTimeout(updateV422Identity,8000);
+
+/* V4.0.23 — corbeille fiable pour l'historique importé */
+const APP_VERSION_V423='4.0.23';
+
+// Le code historique V4.0.2 interceptait les actions AVANT de regarder si le
+// dossier était en corbeille. Un historique déjà supprimé affichait donc encore
+// "Mettre à la corbeille". Toujours traiter l'état corbeille en premier.
+const historyActionsV423Base=historyActionsV331;
+historyActionsV331=function(j){
+  if(j && (j.status==='trashed' || !!j.trashedAt)){
+    return isAdmin()?`<details class="jobMenu"><summary>⋮</summary><div class="jobMenuPanel"><button onclick="restoreFromTrashV331('${j.id}')">Restaurer</button><button class="danger" onclick="permanentlyDeleteJobV331('${j.id}')">Supprimer définitivement</button></div></details>`:'';
+  }
+  return historyActionsV423Base(j);
+};
+
+const historyStatusV423Base=historyStatusV331;
+historyStatusV331=function(j){
+  if(j && (j.status==='trashed' || !!j.trashedAt)) return ['late','Corbeille'];
+  return historyStatusV423Base(j);
+};
+
+// Sécurité : une suppression définitive d'un historique crée bien la pierre
+// tombale avant retrait, afin qu'il ne soit jamais réimporté au redémarrage.
+const permanentlyDeleteJobV423Base=permanentlyDeleteJobV331;
+permanentlyDeleteJobV331=function(id){
+  const j=jobs.find(x=>x.id===id);
+  if(!j)return;
+  return permanentlyDeleteJobV423Base(id);
+};
+
+function updateV423Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.23');
+  document.title='Suivi Parage v4.0.23';
+}
+const initV423Base=init;
+init=async function(){const r=await initV423Base();updateV423Identity();return r;};
+setTimeout(updateV423Identity,0);setTimeout(updateV423Identity,1500);setTimeout(updateV423Identity,8000);
