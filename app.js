@@ -3380,3 +3380,130 @@ cancelCurrentJob=function(){
   current=blankJob();chantierStarted=false;updateChantierUI();showView('home');
   toast(hasData?'Chantier placé dans la corbeille':'Chantier abandonné');
 };
+
+
+/* =====================================================================
+   V4.0.14 — synchronisation anti-écrasement multi-appareils
+   - fusion AVANT chaque écriture cloud
+   - restauration manuelle prioritaire sur d'anciennes suppressions
+   - une pierre tombale ne supprime qu'une version plus ancienne du chantier
+   - mise à jour PWA forcée sur tous les appareils
+   ===================================================================== */
+const APP_VERSION_V414='4.0.14';
+
+function deletionStampV414(id){
+  const n=Date.parse(deletedJobsV413?.[id]||'');
+  return Number.isFinite(n)?n:0;
+}
+function isDeletedV414(job){
+  if(!job?.id)return false;
+  const d=deletionStampV414(job.id);
+  return d>0 && d>jobStampV413(job);
+}
+function mergeJobsV414(localRows=[],cloudRows=[]){
+  const map=new Map();
+  for(const j of [...(cloudRows||[]),...(localRows||[])]){
+    if(!j?.id)continue;
+    const old=map.get(j.id);
+    if(!old || jobStampV413(j)>=jobStampV413(old))map.set(j.id,j);
+  }
+  return [...map.values()].filter(j=>!isDeletedV414(j));
+}
+function mergeDeletedV414(a={},b={}){
+  const out=Object.assign({},a||{});
+  for(const [id,at] of Object.entries(b||{})){
+    if(!out[id]||String(at)>String(out[id]))out[id]=at;
+  }
+  return out;
+}
+function clearObsoleteTombstonesV414(rows=[]){
+  let changed=false;
+  for(const j of rows||[]){
+    if(!j?.id)continue;
+    const d=deletionStampV414(j.id);
+    if(d && jobStampV413(j)>=d){delete deletedJobsV413[j.id];changed=true;}
+  }
+  if(changed)persistDeletedJobsV413();
+}
+
+/* Une restauration manuelle est une action explicite : elle gagne sur le téléphone/cloud ancien. */
+restoreData=function(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const x=JSON.parse(r.result);const restored=Array.isArray(x.jobs)?x.jobs:[];
+      const stamp=new Date().toISOString();
+      restored.forEach(j=>{if(j?.id){j.updatedAt=stamp;delete deletedJobsV413[j.id];}});
+      persistDeletedJobsV413();
+      jobs=restored;
+      settings=Object.assign(settings,x.settings||{});costs=x.costs||{};
+      if(Array.isArray(x.tariffHistory)){tariffHistory=x.tariffHistory;localStorage.setItem('parage.tariffHistory',JSON.stringify(tariffHistory));}
+      originalSaveAllV3();
+      localStorage.setItem('parage.settings',JSON.stringify(settings));
+      localStorage.setItem('parage.costs',JSON.stringify(costs));
+      localStorage.setItem('parage.pendingSync','1');
+      loadSettings();renderHome();renderHistory();renderAccounting();updateSyncBadge();
+      sharedCloudBackup(false).then(ok=>toast(ok?'Sauvegarde restaurée et sécurisée dans le cloud':'Sauvegarde restaurée localement — synchro cloud en attente'));
+    }catch(err){toast('Fichier invalide');}
+  };
+  r.readAsText(f);e.target.value='';
+};
+
+/* Lecture cloud : fusion datée ; une suppression ancienne ne peut plus effacer un chantier restauré/modifié après elle. */
+sharedCloudRestore=async function(silent=false){
+  if(!authSession||!navigator.onLine)return false;
+  const c=cloudConfig();
+  try{
+    const r=await fetch(`${c.url}/rest/v1/parage_backups?id=eq.suivi-parage-main&select=payload,updated_at`,{headers:authHeaders(),cache:'no-store'});
+    if(r.status===401&&await refreshAuthSession())return sharedCloudRestore(silent);
+    if(!r.ok)throw new Error(await r.text());const rows=await r.json();
+    if(!rows.length){if(canEditJobs()||canEditAccounting())await sharedCloudBackup(false);return true;}
+    const p=rows[0].payload||{};
+    deletedJobsV413=mergeDeletedV414(deletedJobsV413,p.deletedJobsV413||{});persistDeletedJobsV413();
+    jobs=mergeJobsV414(jobs,p.jobs||[]);clearObsoleteTombstonesV414(jobs);
+    costs=Object.assign({},p.costs||{},costs||{});
+    addressOverrides=Object.assign({},p.addressOverrides||{},addressOverrides||{});
+    importedClients=mergeClientBases(p.importedClients||[],importedClients||[]);
+    if(Array.isArray(p.tariffHistory)){tariffHistory=mergeByIdV413(tariffHistory,p.tariffHistory);localStorage.setItem('parage.tariffHistory',JSON.stringify(tariffHistory));}
+    const localCloud={supabaseUrl:settings.supabaseUrl,supabaseKey:settings.supabaseKey,accountingEmail:settings.accountingEmail};
+    settings=Object.assign(settings,p.settings||{},localCloud);
+    originalSaveAllV3();localStorage.setItem('parage.costs',JSON.stringify(costs));localStorage.setItem('parage.addressOverrides',JSON.stringify(addressOverrides));localStorage.setItem('parage.importedClients',JSON.stringify(importedClients));localStorage.setItem('parage.settings',JSON.stringify(settings));
+    loadSettings();renderHome();renderHistory();renderAccounting();if(!silent)toast('Données fusionnées sans écrasement');return true;
+  }catch(e){if(!silent)toast('Lecture cloud impossible — données locales conservées');return false;}
+};
+cloudRestore=()=>sharedCloudRestore(false);
+
+/* Écriture cloud sécurisée : relire puis fusionner JUSTE AVANT le POST. */
+sharedCloudBackup=async function(showToast=true){
+  if(cloudBusy||!authSession||!navigator.onLine||role()==='technicien')return false;
+  const c=cloudConfig();if(!c.key)return false;cloudBusy=true;updateSyncBadge('Synchronisation sécurisée…');
+  try{
+    let remote={};
+    const g=await fetch(`${c.url}/rest/v1/parage_backups?id=eq.suivi-parage-main&select=payload,updated_at`,{headers:authHeaders(),cache:'no-store'});
+    if(g.status===401&&await refreshAuthSession()){cloudBusy=false;return sharedCloudBackup(showToast);}
+    if(g.ok){const a=await g.json();remote=a[0]?.payload||{};}
+    deletedJobsV413=mergeDeletedV414(deletedJobsV413,remote.deletedJobsV413||{});
+    jobs=mergeJobsV414(jobs,remote.jobs||[]);clearObsoleteTombstonesV414(jobs);persistDeletedJobsV413();
+    if(Array.isArray(remote.tariffHistory)){tariffHistory=mergeByIdV413(tariffHistory,remote.tariffHistory);localStorage.setItem('parage.tariffHistory',JSON.stringify(tariffHistory));}
+    originalSaveAllV3();
+    const payload=Object.assign({},sharedPayloadV413Base(),{jobs,deletedJobsV413,tariffHistory,version:APP_VERSION_V414,updatedBy:currentProfile?.email||''});
+    const r=await fetch(`${c.url}/rest/v1/parage_backups?on_conflict=id`,{method:'POST',headers:authHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({id:'suivi-parage-main',payload,updated_at:new Date().toISOString()})});
+    if(r.status===401&&await refreshAuthSession()){cloudBusy=false;return sharedCloudBackup(showToast);}
+    if(!r.ok)throw new Error(await r.text());
+    localStorage.removeItem('parage.pendingSync');updateSyncBadge();renderHome();renderHistory();renderAccounting();if(showToast)toast('Cloud sécurisé et à jour');return true;
+  }catch(e){localStorage.setItem('parage.pendingSync','1');updateSyncBadge('Erreur de synchronisation');if(showToast)toast('Données locales conservées — cloud non modifié');return false;
+  }finally{cloudBusy=false;}
+};
+cloudBackup=sharedCloudBackup;
+
+function updateV414Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.14');document.title='Suivi Parage v4.0.14';}
+const enterApplicationV414Base=enterApplication;
+enterApplication=async function(){const r=await enterApplicationV414Base();updateV414Identity();return r;};
+setTimeout(updateV414Identity,5800);
+
+/* Force l'installation immédiate de la nouvelle version PWA. */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js?v=4.0.14',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
+}
