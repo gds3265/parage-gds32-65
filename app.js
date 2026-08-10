@@ -3894,3 +3894,147 @@ function updateV419Identity(){
 const initV419Base=init;
 init=async function(){const r=await initV419Base();updateV419Identity();checkRemoteVersionV419();return r;};
 setTimeout(updateV419Identity,0);setTimeout(updateV419Identity,1200);setTimeout(updateV419Identity,7000);
+
+/* =====================================================================
+   V4.0.21 — forfait déplacement par département + corbeille historique
+   - 31 / 32 / 65 : 70 € HT ; autres départements : 80 € HT.
+   - Application automatique uniquement aux nouveaux chantiers tant que le
+     forfait n'a pas été modifié manuellement.
+   - Les dossiers en corbeille/annulés sont exclus des compteurs d'accueil.
+   - Une suppression définitive d'un dossier historique reste supprimée :
+     l'import historique respecte désormais les pierres tombales.
+   ===================================================================== */
+const APP_VERSION_V421='4.0.21';
+
+function normalizeDepartmentV421(value){
+  const s=String(value??'').trim();
+  const m=s.match(/(?:^|\D)(31|32|65)(?:\D|$)/);
+  if(m)return m[1];
+  const digits=s.replace(/\D/g,'');
+  return digits.slice(0,2);
+}
+function feeForDepartmentV421(value){
+  const d=normalizeDepartmentV421(value);
+  return ['31','32','65'].includes(d)?70:80;
+}
+function applyDepartmentFeeV421(force=false){
+  if(!current || current.importedHistory || current.status==='finished' || current.status==='cancelled' || current.status==='trashed')return;
+  if(!force && current.autoFeeV421===false)return;
+  const dep=$('department')?.value || current.department || '';
+  if(!normalizeDepartmentV421(dep))return;
+  const fee=feeForDepartmentV421(dep);
+  current.department=dep;
+  current.fee=fee;
+  current.autoFeeV421=true;
+  if($('fee'))$('fee').value=String(fee);
+  renderTotals();
+  saveDraftSilently();
+}
+
+// Les nouveaux chantiers démarrent sur 70 €, puis passent automatiquement à
+// 80 € si le département choisi n'est pas 31, 32 ou 65.
+const blankJobV421Base=blankJob;
+blankJob=function(){
+  const j=blankJobV421Base();
+  j.fee=70;
+  j.autoFeeV421=true;
+  return j;
+};
+
+// Une saisie manuelle du forfait déplacement doit rester prioritaire.
+document.addEventListener('input',e=>{
+  if(e.target?.id==='fee'&&current)current.autoFeeV421=false;
+  if(e.target?.id==='department'){
+    if(current)current.department=e.target.value;
+    applyDepartmentFeeV421();
+  }
+  if(e.target?.id==='cheptel'){
+    setTimeout(()=>{
+      if(current && $('department')?.value){current.department=$('department').value;applyDepartmentFeeV421();}
+    },180);
+  }
+});
+document.addEventListener('change',e=>{
+  if(e.target?.id==='department')applyDepartmentFeeV421();
+});
+
+// Recherche par nom/commune : appliquer le forfait juste après le choix.
+const selectClientV421Base=selectClientV415;
+selectClientV415=function(i){
+  const r=selectClientV421Base(i);
+  if(current)current.autoFeeV421=current.autoFeeV421!==false;
+  applyDepartmentFeeV421();
+  return r;
+};
+
+// Les compteurs de l'accueil représentent uniquement les chantiers réellement
+// effectués : jamais un brouillon, un annulé ou un élément de la corbeille.
+renderHome=function(){
+  const month=today().slice(0,7);
+  const monthJobs=(jobs||[]).filter(j=>j && j.status!=='trashed' && !j.trashedAt && j.status!=='cancelled' && !j.cancelledAt && String(j.date||'').startsWith(month) && (j.status==='finished' || j.importedHistory===true));
+  const counts=monthJobs.reduce((s,j)=>{
+    const x=calc(j);s.n+=(Number(x.n)||0);s.pairs+=(Number(x.pairs)||0);s.single+=(Number(x.single)||0);s.ttc+=(Number(x.ttc)||0);return s;
+  },{n:0,pairs:0,single:0,ttc:0});
+  if($('homeCards'))$('homeCards').innerHTML=
+    card('Chantiers du mois',monthJobs.length)+
+    card('Bovins',counts.n)+
+    card('Pieds travaillés',counts.pairs*2+counts.single)+
+    card('À transmettre',(jobs||[]).filter(j=>j && j.status==='finished' && !j.trashedAt && !j.cancelledAt && !j.exportedAt).length)+
+    card('CA TTC du mois',euro(counts.ttc));
+};
+
+// Un dossier supprimé définitivement avant cette version peut avoir été
+// réinjecté par le fichier historique. S'il possède déjà une pierre tombale,
+// on le retire immédiatement de la liste locale.
+(function cleanupResurrectedHistoricalV421(){
+  if(typeof deletedJobsV413==='undefined')return;
+  const before=jobs.length;
+  jobs=jobs.filter(j=>!j?.id || !deletedJobsV413[j.id]);
+  if(jobs.length!==before)saveAll();
+})();
+
+// L'import historique V4.0.2 ne connaissait pas les suppressions définitives.
+// Cette version refuse désormais toute ligne dont l'identifiant a été supprimé.
+importHistoricalDataV402=async function(force=false){
+  try{
+    const response=await fetch(`historical_jobs_2025_2026.json?v=${APP_VERSION_V421}`,{cache:'no-store'});
+    if(!response.ok)throw new Error('Fichier historique indisponible');
+    const payload=await response.json(),incoming=Array.isArray(payload)?payload:(payload.jobs||[]);
+    const existingIds=new Set(jobs.map(j=>j.id));
+    const existingKeys=new Set(jobs.map(historicalImportKeyV402));
+    let added=0,duplicates=0,deleted=0;
+    for(const raw of incoming){
+      const j=JSON.parse(JSON.stringify(raw));
+      if(j?.id && typeof deletedJobsV413!=='undefined' && deletedJobsV413[j.id]){deleted++;continue;}
+      const key=historicalImportKeyV402(j);
+      if(existingIds.has(j.id)||existingKeys.has(key)){duplicates++;continue;}
+      jobs.push(j);existingIds.add(j.id);existingKeys.add(key);added++;
+      if(j.cheptel&&!clients.some(c=>String(c.cheptel)===String(j.cheptel))){
+        const c={cheptel:j.cheptel,nom:j.clientName||'',adresse:j.address||'',cpVille:j.cpVille||'',departement:j.department||''};
+        importedClients.push(c);clients.push(c);
+      }
+    }
+    if(added||force){
+      importedClients=mergeClientBases([],importedClients);
+      localStorage.setItem('parage.importedClients',JSON.stringify(importedClients));
+      localStorage.setItem('parage.historicalImportV402',JSON.stringify({at:new Date().toISOString(),added,duplicates,deleted,total:incoming.length}));
+      saveAll();renderHome();renderHistory();renderAccounting();
+      if(typeof sharedCloudBackup==='function')sharedCloudBackup(false).catch(()=>{});
+      logActionV4?.('Synchronisation','Historique 2025–2026 intégré',null,`${added} ajouté(s), ${duplicates} doublon(s), ${deleted} supprimé(s) ignoré(s)`);
+    }
+    renderHistoricalImportStatusV402();
+    if(force)toast(`${added} chantier(s) historique(s) ajouté(s), ${duplicates} doublon(s) ignoré(s)`);
+    return {added,duplicates,deleted,total:incoming.length};
+  }catch(e){
+    if(force)toast('Import historique impossible');
+    return {added:0,duplicates:0,deleted:0,total:0,error:String(e)};
+  }
+};
+
+function updateV421Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.21');
+  document.title='Suivi Parage v4.0.21';
+}
+const initV421Base=init;
+init=async function(){const r=await initV421Base();updateV421Identity();renderHome();return r;};
+setTimeout(updateV421Identity,0);setTimeout(updateV421Identity,1200);setTimeout(updateV421Identity,7200);
