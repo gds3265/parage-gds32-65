@@ -1,8 +1,53 @@
-const C='suivi-parage-v4-0-18';
-const FILES=['./','index.html?v=4.0.18','style.css?v=4.0.18','app.js?v=4.0.18','manifest.json?v=4.0.18','app-logo.png?v=4.0.18','icon-192.png?v=4.0.18','icon-512.png?v=4.0.18','apple-touch-icon.png?v=4.0.18','favicon.png?v=4.0.18','assets/logo-gds.png','assets/logo-gds.jpg','clients.json','historical_jobs_2025_2026.json'];
-self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(FILES)))});
-self.addEventListener('activate',e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==C).map(k=>caches.delete(k))))])));
-self.addEventListener('fetch',e=>{
-  if(e.request.method!=='GET')return;
-  e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(C).then(c=>c.put(e.request,copy));return r;}).catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html?v=4.0.18'))));
+const VERSION='4.0.19';
+const CACHE=`suivi-parage-v4-0-19`;
+const CORE=[
+  './index.html?v=4.0.19','./style.css?v=4.0.19','./app.js?v=4.0.19',
+  './manifest.json?v=4.0.19','./version.json','./app-logo.png?v=4.0.19',
+  './icon-192.png?v=4.0.19','./icon-512.png?v=4.0.19','./apple-touch-icon.png?v=4.0.19','./favicon.png?v=4.0.19'
+];
+
+self.addEventListener('install',event=>{
+  self.skipWaiting();
+  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).catch(()=>{}));
+});
+
+self.addEventListener('activate',event=>{
+  event.waitUntil((async()=>{
+    const keys=await caches.keys();
+    // IMPORTANT : CacheStorage est partagé par origine GitHub Pages.
+    // On ne supprime QUE les anciens caches de Suivi Parage.
+    await Promise.all(keys.filter(k=>k.startsWith('suivi-parage-')&&k!==CACHE).map(k=>caches.delete(k)));
+    await self.clients.claim();
+    const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+    clients.forEach(c=>c.postMessage({type:'PARAGE_VERSION_READY',version:VERSION}));
+  })());
+});
+
+self.addEventListener('fetch',event=>{
+  if(event.request.method!=='GET')return;
+  const url=new URL(event.request.url);
+  if(url.origin!==self.location.origin)return;
+
+  // HTML/navigation/version : réseau d'abord pour voir une nouvelle version tout de suite.
+  if(event.request.mode==='navigate'||url.pathname.endsWith('/index.html')||url.pathname.endsWith('/version.json')){
+    event.respondWith((async()=>{
+      try{
+        const fresh=await fetch(event.request,{cache:'no-store'});
+        if(fresh&&fresh.ok){const cache=await caches.open(CACHE);cache.put(event.request,fresh.clone());}
+        return fresh;
+      }catch(e){
+        return (await caches.match(event.request)) || (await caches.match('./index.html?v=4.0.19')) || Response.error();
+      }
+    })());
+    return;
+  }
+
+  // Ressources statiques : réseau d'abord, cache en secours.
+  event.respondWith((async()=>{
+    try{
+      const fresh=await fetch(event.request,{cache:'no-store'});
+      if(fresh&&fresh.ok){const cache=await caches.open(CACHE);cache.put(event.request,fresh.clone());}
+      return fresh;
+    }catch(e){return (await caches.match(event.request))||Response.error();}
+  })());
 });

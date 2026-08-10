@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=3.3');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.19');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=2.0').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.19').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -3507,7 +3507,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.14',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.19',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3616,7 +3616,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.17',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.19',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3831,3 +3831,66 @@ function updateV418Identity(){
 const initV418Base=init;
 init=async function(){const r=await initV418Base();updateV418Identity();return r;};
 setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(updateV418Identity,6500);
+
+
+/* =====================================================================
+   V4.0.19 — mise à jour PWA automatique et sûre
+   - Un seul numéro de service worker pour toutes les anciennes routines.
+   - Vérification réseau de version au démarrage et au retour au premier plan.
+   - Recharge automatique dès qu'un nouveau service worker prend le contrôle.
+   - Aucune donnée métier/localStorage n'est effacée.
+   ===================================================================== */
+const APP_VERSION_V419='4.0.19';
+let parageReloadingV419=false;
+
+async function forceParageUpdateV419(){
+  if(!('serviceWorker' in navigator))return;
+  try{
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.19',{updateViaCache:'none'});
+    await reg.update();
+  }catch(e){}
+}
+
+async function checkRemoteVersionV419(){
+  try{
+    const r=await fetch(`version.json?t=${Date.now()}`,{cache:'no-store'});
+    if(!r.ok)return;
+    const info=await r.json();
+    if(info?.version && info.version!==APP_VERSION_V419){
+      await forceParageUpdateV419();
+      // Le SW déclenchera normalement controllerchange. Ce rechargement de secours
+      // prend une URL non cachable sans toucher aux données locales.
+      setTimeout(()=>{
+        if(!parageReloadingV419){
+          parageReloadingV419=true;
+          const u=new URL(location.href);u.searchParams.set('_v',info.version);location.replace(u.toString());
+        }
+      },1200);
+    }
+  }catch(e){}
+}
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(parageReloadingV419)return;
+    parageReloadingV419=true;
+    location.reload();
+  });
+  navigator.serviceWorker.addEventListener('message',e=>{
+    if(e.data?.type==='PARAGE_VERSION_READY'&&e.data.version!==APP_VERSION_V419){
+      if(!parageReloadingV419){parageReloadingV419=true;location.reload();}
+    }
+  });
+  forceParageUpdateV419();
+}
+window.addEventListener('pageshow',()=>checkRemoteVersionV419());
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkRemoteVersionV419();});
+setInterval(checkRemoteVersionV419,15*60*1000);
+
+function updateV419Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.19');
+  document.title='Suivi Parage v4.0.19';
+}
+const initV419Base=init;
+init=async function(){const r=await initV419Base();updateV419Identity();checkRemoteVersionV419();return r;};
+setTimeout(updateV419Identity,0);setTimeout(updateV419Identity,1200);setTimeout(updateV419Identity,7000);
