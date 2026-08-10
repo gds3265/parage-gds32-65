@@ -1225,7 +1225,7 @@ renderHome = function(){
    V3.0 — Connexion Supabase, rôles et base partagée
    ===================================================================== */
 const APP_VERSION_FINAL = '3.3.1';
-const DEFAULT_SUPABASE_URL = 'https://kwbkqdkzdrjoxpzvfztg.supabase.co';
+const DEFAULT_SUPABASE_URL = 'https://ckylznynqsefqkmtjcjf.supabase.co';
 let authSession = JSON.parse(localStorage.getItem('parage.authSession') || 'null');
 let currentProfile = null;
 let cloudTimer = null;
