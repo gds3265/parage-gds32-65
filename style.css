@@ -144,3 +144,8 @@ body.mode-terrain #nav button{font-size:15px;padding:12px 18px}
   .compactHeader .headerStatus{max-width:58vw!important;}
 }
 @media(max-width:700px){.logoutBtn{display:inline-flex!important;}}
+
+
+/* V4.0.24 — menus mobiles, gratuités et aperçu PDF multipage */
+.giftBoxV424{margin:12px 0;padding:11px 12px;border:1px solid #e3afc8;background:#fff4f9;border-radius:11px}.giftTitleV424{font-weight:800;color:#9d2b5d;margin-bottom:8px}.giftMainV424,.giftServicesV424 label{display:flex;flex-direction:row;align-items:center;gap:7px;font-weight:600}.giftMainV424 input,.giftServicesV424 input{width:auto;transform:scale(1.15)}.giftMainV424 span{font-weight:400;color:#815267}.giftServicesV424{display:flex;gap:14px;flex-wrap:wrap;margin:9px 0}.giftBoxV424 small,.giftQtyV424{color:#9d2b5d;font-weight:700}.giftQtyV424{display:block;font-size:10px;margin-top:2px}.giftTotalV424 td{background:#fff4f9;color:#9d2b5d;font-weight:700}.pdfIosHintV424{background:#fff7df;border:1px solid #e2be62;border-radius:10px;padding:8px 10px;font-size:13px}.pdfFullV424{background:#fff0f7;border:2px solid #b83278;color:#8f245f}.pdfOverlay iframe{min-height:0;-webkit-overflow-scrolling:touch}
+@media(max-width:600px){.jobMenuPanel{position:absolute!important;left:auto!important;right:0!important;top:42px!important;bottom:auto!important;width:min(310px,calc(100vw - 34px));max-height:none;overflow:visible}.giftServicesV424{display:grid;grid-template-columns:1fr}.pdfToolbar{align-items:stretch}.pdfToolbar strong{width:100%;margin:0}.pdfToolbar button{flex:1}.pdfIosHintV424{font-size:12px}}

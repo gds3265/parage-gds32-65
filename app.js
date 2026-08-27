@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.23');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.24');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.23').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.24').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -3507,7 +3507,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.23',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.24',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3616,7 +3616,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.23',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.24',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3840,13 +3840,13 @@ setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(
    - Recharge automatique dès qu'un nouveau service worker prend le contrôle.
    - Aucune donnée métier/localStorage n'est effacée.
    ===================================================================== */
-const APP_VERSION_V419='4.0.23';
+const APP_VERSION_V419='4.0.24';
 let parageReloadingV419=false;
 
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.23',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.24',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -3888,8 +3888,8 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 setInterval(checkRemoteVersionV419,15*60*1000);
 
 function updateV419Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.23');
-  document.title='Suivi Parage v4.0.23';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.24');
+  document.title='Suivi Parage v4.0.24';
 }
 const initV419Base=init;
 init=async function(){const r=await initV419Base();updateV419Identity();checkRemoteVersionV419();return r;};
@@ -4040,14 +4040,14 @@ init=async function(){const r=await initV421Base();updateV421Identity();renderHo
 setTimeout(updateV421Identity,0);setTimeout(updateV421Identity,1200);setTimeout(updateV421Identity,7200);
 
 
-/* V4.0.23 — correctif boucle de rechargement PWA */
-const APP_VERSION_V422='4.0.23';
-function updateV422Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.23');document.title='Suivi Parage v4.0.23';}
+/* V4.0.24 — correctif boucle de rechargement PWA */
+const APP_VERSION_V422='4.0.24';
+function updateV422Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.24');document.title='Suivi Parage v4.0.24';}
 const initV422Base=init;init=async function(){const r=await initV422Base();updateV422Identity();return r;};
 setTimeout(updateV422Identity,0);setTimeout(updateV422Identity,1500);setTimeout(updateV422Identity,8000);
 
-/* V4.0.23 — corbeille fiable pour l'historique importé */
-const APP_VERSION_V423='4.0.23';
+/* V4.0.24 — corbeille fiable pour l'historique importé */
+const APP_VERSION_V423='4.0.24';
 
 // Le code historique V4.0.2 interceptait les actions AVANT de regarder si le
 // dossier était en corbeille. Un historique déjà supprimé affichait donc encore
@@ -4076,9 +4076,182 @@ permanentlyDeleteJobV331=function(id){
 };
 
 function updateV423Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.23');
-  document.title='Suivi Parage v4.0.23';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.24');
+  document.title='Suivi Parage v4.0.24';
 }
 const initV423Base=init;
 init=async function(){const r=await initV423Base();updateV423Identity();return r;};
 setTimeout(updateV423Identity,0);setTimeout(updateV423Identity,1500);setTimeout(updateV423Identity,8000);
+
+
+/* =====================================================================
+   V4.0.24 — aperçu PDF multipage iPhone + menus mobiles + actes offerts
+   - iOS : bouton explicite pour ouvrir le PDF complet dans le lecteur système.
+   - Menus ⋮ : restent attachés au chantier et se ferment au clic/scroll.
+   - Gratuités : animal entier, parage, pansements ou talonnettes.
+     Les quantités restent comptées ; seules les quantités facturables sont payantes.
+   ===================================================================== */
+const APP_VERSION_V424='4.0.24';
+
+function freeServicesV424(animal){
+  if(!animal.freeServicesV424 || typeof animal.freeServicesV424!=='object') animal.freeServicesV424={};
+  return animal.freeServicesV424;
+}
+function setAnimalFreeV424(id,key,value){
+  const a=current?.animals?.find(x=>x.id===id);if(!a)return;
+  if(key==='all') a.freeAnimalV424=!!value;
+  else freeServicesV424(a)[key]=!!value;
+  saveDraftSilently?.();renderAnimals();
+}
+function giftSummaryV424(a){
+  const f=freeServicesV424(a),parts=[];
+  if(a.freeAnimalV424)return 'Animal offert';
+  if(f.parage)parts.push('parage');
+  if(f.bandage)parts.push('pansement(s)');
+  if(f.block)parts.push('talonnette(s)');
+  return parts.length?'Offert : '+parts.join(', '):'';
+}
+
+const renderAnimalsV424Base=renderAnimals;
+renderAnimals=function(){
+  renderAnimalsV424Base();
+  const cards=[...document.querySelectorAll('#animals .animal')];
+  (current?.animals||[]).forEach((a,i)=>{
+    const card=cards[i];if(!card||a.collapsed)return;
+    const anchor=card.querySelector('.animalActions');if(!anchor||card.querySelector('.giftBoxV424'))return;
+    const f=freeServicesV424(a),box=document.createElement('div');box.className='giftBoxV424';
+    box.innerHTML=`<div class="giftTitleV424">🎁 Gratuité / geste commercial</div>
+      <label class="giftMainV424"><input type="checkbox" ${a.freeAnimalV424?'checked':''} onchange="setAnimalFreeV424('${a.id}','all',this.checked)"> <b>Animal offert</b> <span>— parage + soins à 0 €</span></label>
+      <div class="giftServicesV424">
+        <label><input type="checkbox" ${f.parage?'checked':''} onchange="setAnimalFreeV424('${a.id}','parage',this.checked)"> Parage offert</label>
+        <label><input type="checkbox" ${f.bandage?'checked':''} onchange="setAnimalFreeV424('${a.id}','bandage',this.checked)"> Pansement(s) offert(s)</label>
+        <label><input type="checkbox" ${f.block?'checked':''} onchange="setAnimalFreeV424('${a.id}','block',this.checked)"> Talonnette(s) offerte(s)</label>
+      </div><small>Les actes offerts restent comptés dans l’activité et apparaissent sur la pro forma.</small>`;
+    anchor.parentNode.insertBefore(box,anchor);
+  });
+};
+
+function animalCountsV424(animal){
+  syncLegacyAnimal(animal);ensureWorkedFeet(animal);
+  const worked=new Set(animal.workedFeet||[]);let pairs=0,pairedFeet=0,band=0,blocks=0;
+  if(worked.has('PAvG')&&worked.has('PAvD')){pairs++;pairedFeet+=2;}
+  if(worked.has('PArG')&&worked.has('PArD')){pairs++;pairedFeet+=2;}
+  const single=Math.max(0,worked.size-pairedFeet);
+  for(const d of Object.values(animal.claws||{})){
+    if((d.care||[]).includes('Pansement'))band++;
+    if((d.care||[]).includes('Talonnette'))blocks++;
+  }
+  return {pairs,single,band,blocks};
+}
+
+const calcV424ImportedBase=calc;
+function calcV424(job=current){
+  if(job?.importedHistory)return calcV424ImportedBase(job);
+  const animals=(job?.animals||[]).map(syncLegacyAnimal),populated=animals.filter(a=>hasAnimalContent(a)),n=populated.length;
+  let pairs=0,single=0,band=0,blocks=0,freePairs=0,freeSingle=0,freeBand=0,freeBlocks=0,freeAnimals=0;
+  for(const a of populated){
+    const q=animalCountsV424(a),f=freeServicesV424(a),all=!!a.freeAnimalV424;
+    pairs+=q.pairs;single+=q.single;band+=q.band;blocks+=q.blocks;
+    if(all)freeAnimals++;
+    if(all||f.parage){freePairs+=q.pairs;freeSingle+=q.single;}
+    if(all||f.bandage)freeBand+=q.band;
+    if(all||f.block)freeBlocks+=q.blocks;
+  }
+  const billPairs=Math.max(0,pairs-freePairs),billSingle=Math.max(0,single-freeSingle),billBand=Math.max(0,band-freeBand),billBlocks=Math.max(0,blocks-freeBlocks);
+  const p=job?.lockedPricingV412&&!job?.importedHistory?job.lockedPricingV412:null;
+  // Conserve la règle V4.0.17/18 : un tarif saisi manuellement prime sur le snapshot historique.
+  const pairRate=job?.customPairRate!=null ? +job.customPairRate : (p?(+p.pairRate||0):(n<=1?+settings.pairOne:+settings.pairMany));
+  const footRate=job?.customFootRate!=null ? +job.customFootRate : (p?(+p.footRate||0):(n<=1?+settings.footOne:+settings.footMany));
+  const bandageRate=job?.customBandageRate!=null ? +job.customBandageRate : (p?(+p.bandageRate||0):+settings.bandagePrice);
+  const blockRate=job?.customBlockRate!=null ? +job.customBlockRate : (p?(+p.blockRate||0):+settings.blockPrice);
+  const fee=+job?.fee||0,vat=p?(+p.vat||0):(+settings.vat||0);
+  const careTotal=billPairs*pairRate+billSingle*footRate+billBand*bandageRate+billBlocks*blockRate;
+  const giftTotal=freePairs*pairRate+freeSingle*footRate+freeBand*bandageRate+freeBlocks*blockRate;
+  const ht=fee+careTotal,ttc=ht*(1+vat/100);
+  return {n,pairs,single,band,blocks,freeAnimals,freePairs,freeSingle,freeBand,freeBlocks,billPairs,billSingle,billBand,billBlocks,giftTotal,careTotal,ht,ttc,pairRate,footRate,bandageRate,blockRate,fee,vat,lockedPricing:!!p};
+}
+calc=calcV424;
+
+function qtyGiftHtmlV424(total,free){return free?`${total} <small class="giftQtyV424">dont ${free} offert${free>1?'s':''}</small>`:String(total);}
+renderTotals=function(){
+  const active=document.activeElement;
+  const rateMap=(typeof rateFieldMapV418!=='undefined')?rateFieldMapV418:{};
+  const keep=active&&rateMap[active.id]?{el:active,value:active.value,selStart:active.selectionStart,selEnd:active.selectionEnd}:null;
+  const c=calc(current);
+  if($('jobPairRate')){
+    $('jobPairRate').value=current.customPairRate??c.pairRate;
+    $('jobFootRate').value=current.customFootRate??c.footRate;
+    $('jobBandageRate').value=current.customBandageRate??c.bandageRate;
+    $('jobBlockRate').value=current.customBlockRate??c.blockRate;
+  }
+  const rows=[
+    ['Déplacement et mise en place','1',c.fee,c.fee],
+    ['Paires de pieds',qtyGiftHtmlV424(c.pairs,c.freePairs),c.pairRate,c.billPairs*c.pairRate],
+    ['Pieds seuls',qtyGiftHtmlV424(c.single,c.freeSingle),c.footRate,c.billSingle*c.footRate],
+    ['Pansements',qtyGiftHtmlV424(c.band,c.freeBand),c.bandageRate,c.billBand*c.bandageRate],
+    ['Talonnettes',qtyGiftHtmlV424(c.blocks,c.freeBlocks),c.blockRate,c.billBlocks*c.blockRate]
+  ];
+  if($('pricingSummary'))$('pricingSummary').innerHTML=`<table class="pricingTable"><tr><th>Prestation</th><th>Quantité</th><th>Tarif HT</th><th>Sous-total HT</th></tr>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${euro(r[2])}</td><td><b>${euro(r[3])}</b></td></tr>`).join('')}${c.giftTotal>0?`<tr class="giftTotalV424"><td colspan="3">🎁 Gratuités / gestes commerciaux</td><td><b>${euro(c.giftTotal)} offert</b><br><small>déjà déduit</small></td></tr>`:''}<tr class="pricingTotal"><th colspan="3">Total HT</th><th>${euro(c.ht)}</th></tr><tr class="pricingTotal"><th colspan="3">TVA ${c.vat}%</th><th>${euro(c.ttc-c.ht)}</th></tr><tr class="pricingTotal"><th colspan="3">Total TTC</th><th>${euro(c.ttc)}</th></tr></table>`;
+  const gifts=c.freePairs+c.freeSingle+c.freeBand+c.freeBlocks;
+  if($('jobTotals'))$('jobTotals').innerHTML=`<span>Animaux <b>${c.n}</b></span><span>Paires <b>${c.pairs}</b></span><span>Pieds seuls <b>${c.single}</b></span><span>Pansements <b>${c.band}</b></span><span>Talonnettes <b>${c.blocks}</b></span>${gifts?`<span>🎁 Actes offerts <b>${gifts}</b></span>`:''}<span>Total HT <b>${euro(c.ht)}</b></span><span>TTC <b>${euro(c.ttc)}</b></span>`;
+  if($('finishJobBtn'))$('finishJobBtn').textContent=`Terminer le chantier (${c.n} bovin${c.n>1?'s':''} fait${c.n>1?'s':''})`;
+  if($('validateJobBtn'))$('validateJobBtn').textContent=`Valider le chantier (${c.n} bovin${c.n>1?'s':''})`;
+  if(keep&&document.body.contains(keep.el)){
+    keep.el.value=keep.value;try{keep.el.setSelectionRange(keep.selStart,keep.selEnd);}catch(e){}
+  }
+};
+
+function pdfQtyV424(total,free){return free?`${total} (${free} off.)`:String(total);}
+function makeProformaPdfV424(job){
+  const c=calc(job),fl=Object.fromEntries(feet),pageW=595,margin=34,ax=[34,88,150,315,450,561];
+  const animalRows=(job.animals||[]).map(a=>{
+    ensureWorkedFeet(a);const probs=[],soins=new Set();
+    for(const [k,d] of Object.entries(a.claws||{})){if((d.issues||[]).length)probs.push(`${k}: ${(d.issues||[]).join(', ')}`);for(const x of(d.care||[]))if(x==='Pansement'||x==='Talonnette')soins.add(x);}
+    for(const code of Object.keys(a.footIssues||{})){if((a.footIssues[code]||[]).includes('Dermatite'))probs.push(`${fl[code]||code}: Dermatite (entre les onglons)`);}
+    const gift=giftSummaryV424(a);if(gift)soins.add('OFFERT: '+gift.replace(/^Offert : /,''));
+    const vals=[a.number||'-',categoryLabels[a.category]||a.category||'-',(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')||'-',probs.join('; ')||'RAS',[...soins].join(', ')||'-'];
+    const wrapped=vals.map((v,i)=>pdfWrap311(v,[8,11,28,24,16][i]));const lines=Math.max(...wrapped.map(v=>v.length),1);
+    return {a,wrapped,h:Math.max(20,lines*9+5)+(a.checkNext?15:0)};
+  });
+  const pages=[];let remaining=[...animalRows],first=true;const firstStartY=372,nextStartY=730,bottomReserve=82;
+  while(remaining.length||pages.length===0){let y=first?firstStartY:nextStartY,rows=[];while(remaining.length){const r=remaining[0];if(y-r.h<bottomReserve&&rows.length)break;if(y-r.h<bottomReserve&&!rows.length){rows.push(remaining.shift());break;}rows.push(remaining.shift());y-=r.h;}pages.push({first,rows});first=false;}
+  const streams=pages.map((page,pageIndex)=>{const cmds=[];const text=(x,y,size,value,bold=false)=>cmds.push(`BT /${bold?'F2':'F1'} ${size} Tf ${x} ${y} Td (${pdfEsc311(value)}) Tj ET`);const line=(x1,y1,x2,y2,w=.6)=>cmds.push(`${w} w ${x1} ${y1} m ${x2} ${y2} l S`);const rect=(x,y,w,h)=>cmds.push(`${x} ${y} ${w} ${h} re S`);const fillRect=(x,y,w,h,g=.95)=>cmds.push(`${g} g ${x} ${y} ${w} ${h} re f 0 g`);let y;
+    if(page.first){cmds.push('q 185 0 0 53 34 779 cm /Im1 Do Q');text(250,807,9.5,`PRO FORMA / COMPTE RENDU - ${(job.clientName||'').slice(0,28)}`,true);line(margin,772,pageW-margin,772,1.2);rect(margin,692,250,64);rect(310,692,251,64);text(44,740,9,'GDS Gers Hautes-Pyrenees',true);text(44,726,8,'3 chemin de la Caillaouere');text(44,714,8,'32000 AUCH');text(320,740,9,`Eleveur : ${job.clientName||''}`,true);text(320,726,8,`Cheptel : ${job.cheptel||''}`);text(320,714,8,`${job.address||''}`);text(320,702,8,`${job.cpVille||''}`);text(margin,676,9,`Date : ${fmtDate(job.date)}    Heure : ${job.start||''} - ${job.end||''}`,true);text(margin,657,11,'Prestations',true);
+      const tx=[34,300,365,445,561],top=644,rowH=22;fillRect(tx[0],top-rowH,tx[4]-tx[0],rowH,.92);rect(tx[0],top-rowH,tx[4]-tx[0],rowH);tx.slice(1,-1).forEach(x=>line(x,top-rowH,x,top));['Prestation','Qte','Tarif HT','Total HT'].forEach((h,i)=>text(tx[i]+5,top-15,8,h,true));
+      const priceRows=[['Deplacement / mise en place','1',c.fee,c.fee],['Paires de pieds',pdfQtyV424(c.pairs,c.freePairs),c.pairRate,c.billPairs*c.pairRate],['Pieds seuls',pdfQtyV424(c.single,c.freeSingle),c.footRate,c.billSingle*c.footRate],['Pansements',pdfQtyV424(c.band,c.freeBand),c.bandageRate,c.billBand*c.bandageRate],['Talonnettes',pdfQtyV424(c.blocks,c.freeBlocks),c.blockRate,c.billBlocks*c.blockRate]];
+      priceRows.forEach((r,i)=>{const ry=top-rowH*(i+2);rect(tx[0],ry,tx[4]-tx[0],rowH);tx.slice(1,-1).forEach(x=>line(x,ry,x,ry+rowH));text(tx[0]+5,ry+7,8,r[0]);text(tx[1]+7,ry+7,7.5,r[1]);text(tx[2]+5,ry+7,8,pdfMoney311(r[2]));text(tx[3]+5,ry+7,8,pdfMoney311(r[3]));});
+      y=top-rowH*(priceRows.length+2);[['TOTAL HT',c.ht],['TVA '+c.vat+' %',c.ttc-c.ht],['TOTAL TTC',c.ttc]].forEach((r,i)=>{rect(365,y-rowH*i,196,rowH);line(445,y-rowH*i,445,y-rowH*i+rowH);text(371,y-rowH*i+7,8,r[0],true);text(451,y-rowH*i+7,8,pdfMoney311(r[1]),true);});y-=rowH*3+16;text(margin,y,11,'Recapitulatif de l intervention',true);y-=16;
+    }else{cmds.push('q 150 0 0 43 34 785 cm /Im1 Do Q');text(225,807,11,'PRO FORMA / COMPTE RENDU DE PARAGE - SUITE',true);text(margin,766,8.5,`${job.clientName||''} - Cheptel ${job.cheptel||''} - ${fmtDate(job.date)}`,true);line(margin,754,pageW-margin,754,1);text(margin,744,10,'Recapitulatif de l intervention (suite)',true);y=730;}
+    const headerY=y;fillRect(ax[0],headerY-20,ax[5]-ax[0],20,.92);rect(ax[0],headerY-20,ax[5]-ax[0],20);ax.slice(1,-1).forEach(x=>line(x,headerY-20,x,headerY));['N bovin','Categorie','Pieds realises','Problemes','Soins'].forEach((h,i)=>text(ax[i]+4,headerY-13,7.5,h,true));y=headerY-20;
+    for(const r of page.rows){const baseH=r.h-(r.a.checkNext?15:0);rect(ax[0],y-baseH,ax[5]-ax[0],baseH);ax.slice(1,-1).forEach(x=>line(x,y-baseH,x,y));r.wrapped.forEach((ls,i)=>ls.forEach((t,j)=>text(ax[i]+3,y-11-j*9,7,t)));y-=baseH;if(r.a.checkNext){fillRect(ax[0],y-15,ax[5]-ax[0],15,.96);rect(ax[0],y-15,ax[5]-ax[0],15);text(ax[0]+5,y-10,7,'BOVIN A CONTROLER A LA PROCHAINE VISITE',true);y-=15;}}
+    if(pageIndex===pages.length-1){text(margin,62,8,`Modalite : ${job.paymentTiming||'A reception'}     Mode : ${job.paymentMethod||'A definir'}`,true);text(margin,49,7.5,'Paiement a 20 jours - IBAN FR76 1690 6010 2003 4001 9914 139 - BIC AGRIFRPP869');text(margin,36,7.5,'Document pro forma etabli sur place. La facture definitive sera emise par la comptabilite.');}
+    text(500,20,7,`Page ${pageIndex+1}/${pages.length}`);return cmds.join('\n');
+  });
+  const objects=[],pageObjNums=[],contentObjNums=[];let next=3;for(let i=0;i<streams.length;i++){pageObjNums.push(next++);contentObjNums.push(next++);}const font1=next++,font2=next++,image=next++;objects[1]='<< /Type /Catalog /Pages 2 0 R >>';objects[2]=`<< /Type /Pages /Kids [${pageObjNums.map(n=>n+' 0 R').join(' ')}] /Count ${streams.length} >>`;for(let i=0;i<streams.length;i++){objects[pageObjNums[i]]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${font1} 0 R /F2 ${font2} 0 R >> /XObject << /Im1 ${image} 0 R >> >> /Contents ${contentObjNums[i]} 0 R >>`;objects[contentObjNums[i]]=`<< /Length ${streams[i].length} >>\nstream\n${streams[i]}\nendstream`;}objects[font1]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';objects[font2]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';objects[image]=`<< /Type /XObject /Subtype /Image /Width 737 /Height 212 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter [/ASCIIHexDecode /DCTDecode] /Length ${GDS_LOGO_JPEG_HEX_312.length} >>\nstream\n${GDS_LOGO_JPEG_HEX_312}\nendstream`;return buildPdf311(objects);
+}
+proformaPdfBlob=function(job){return new Blob([makeProformaPdfV424(job)],{type:'application/pdf'});};
+
+/* Safari iPhone/iPad peut n'afficher que la première page d'un PDF blob dans un iframe.
+   L'aperçu reste disponible, avec un accès explicite au lecteur PDF complet. */
+openPdfPreview=function(blob,name,options={}){
+  document.querySelector('.pdfOverlay')?.remove();const url=URL.createObjectURL(blob),validated=!!options.validated;
+  const isAndroid=/Android/i.test(navigator.userAgent),isIOS=/iPad|iPhone|iPod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const overlay=document.createElement('div');overlay.className='pdfOverlay';
+  const fullButton=isIOS?`<button class="pdfFullV424" id="pdfOpenFull">Voir toutes les pages</button>`:'';
+  const viewer=isAndroid?`<div class="pdfAndroidPanel"><div class="pdfIcon">PDF</div><h3>Pro forma prêt</h3><p>Utilisez le lecteur PDF du téléphone pour voir toutes les pages.</p><button class="primary" id="pdfOpenExternal">Ouvrir le PDF complet</button><button id="pdfDownload">Télécharger le PDF</button><button id="pdfShareAndroid">Partager le PDF</button></div>`:`${isIOS?'<div class="pdfIosHintV424">📄 Sur iPhone, l’aperçu intégré peut ne montrer que la page 1. Touchez <b>Voir toutes les pages</b> pour ouvrir le document complet.</div>':''}<iframe title="Apercu pro forma" src="${url}#view=FitH"></iframe>`;
+  overlay.innerHTML=`<div class="pdfToolbar"><strong>${esc(name)}</strong>${fullButton}<button class="primary" id="pdfShare">Partager / imprimer</button><button id="pdfClose">Retour à l'application</button></div>${viewer}`;document.body.appendChild(overlay);
+  const openFull=()=>{const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();};
+  const closePreview=()=>{URL.revokeObjectURL(url);overlay.remove();if(validated){current=blankJob();chantierStarted=false;updateChantierUI();showView('home');toast('OK - chantier enregistré et synchronisé');}};
+  overlay.querySelector('#pdfClose').onclick=closePreview;
+  overlay.querySelector('#pdfShare').onclick=()=>shareBlob(blob,name);
+  if(overlay.querySelector('#pdfOpenFull'))overlay.querySelector('#pdfOpenFull').onclick=openFull;
+  if(isAndroid){overlay.querySelector('#pdfOpenExternal').onclick=openFull;overlay.querySelector('#pdfDownload').onclick=()=>download(blob,name);overlay.querySelector('#pdfShareAndroid').onclick=()=>shareBlob(blob,name);}
+};
+
+function closeJobMenusV424(except=null){document.querySelectorAll('details.jobMenu[open]').forEach(d=>{if(d!==except)d.removeAttribute('open');});}
+document.addEventListener('click',e=>{const menu=e.target.closest?.('details.jobMenu');if(!menu)closeJobMenusV424();else if(e.target.closest('button'))setTimeout(()=>menu.removeAttribute('open'),0);});
+window.addEventListener('scroll',()=>closeJobMenusV424(),{passive:true});
+
+function updateV424Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.24');document.title='Suivi Parage v4.0.24';}
+const initV424Base=init;init=async function(){const r=await initV424Base();updateV424Identity();return r;};
+setTimeout(updateV424Identity,0);setTimeout(updateV424Identity,1500);setTimeout(updateV424Identity,8000);
