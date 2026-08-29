@@ -1,42 +1,120 @@
-<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#8e2c6d" />
-  <title>Paratuberculose GDS 32-65</title>
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand"><span class="brand-mark">PTB</span><div><strong>Paratuberculose</strong><small>GDS 32-65 · v1.2.8</small></div></div>
-    <div class="top-actions">
-      <select id="globalCampaign" title="Campagne active"></select>
-      <button class="ghost" id="btnBackup">Sauvegarde JSON</button>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#b83278"><link rel="manifest" href="manifest.json?v=4.0.24"><link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=4.0.24"><link rel="icon" type="image/png" href="favicon.png?v=4.0.24"><link rel="stylesheet" href="style.css?v=4.0.24"><title>Suivi Parage</title><script>(async()=>{try{const k="parage-pwa-repair-4.0.21";if(!localStorage.getItem(k)){localStorage.setItem(k,"1");if("serviceWorker" in navigator){const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.filter(r=>{try{return new URL(r.scope).pathname.includes("/parage-gds32-65/")}catch(e){return false}}).map(r=>r.unregister()));}if("caches" in window){const keys=await caches.keys();await Promise.all(keys.filter(x=>x.startsWith("suivi-parage-")).map(x=>caches.delete(x)));}const u=new URL(location.href);if(!u.searchParams.has("fresh")){u.searchParams.set("fresh","4.0.21");location.replace(u.toString());}}}catch(e){console.warn("PWA repair",e);}})();</script></head><body>
+<div id="loginScreen" class="loginScreen">
+  <div class="loginCard">
+    <img src="app-logo.png?v=4.0.24" alt="Suivi Parage">
+    <h1>Suivi Parage</h1>
+    <p>Connexion sécurisée</p>
+    <div id="cloudConfigBox" class="cloudConfigBox" hidden>
+      <label>URL Supabase<input id="loginSupabaseUrl" placeholder="https://xxxx.supabase.co"></label>
+      <label>Clé publique Supabase<input id="loginSupabaseKey" type="password" placeholder="sb_publishable_..."></label>
+      <button type="button" onclick="saveLoginCloudConfig()">Enregistrer la connexion Supabase</button>
     </div>
-  </header>
-
-  <div class="app-shell">
-    <nav class="sidebar" id="sidebar">
-      <button data-view="todo" class="nav-btn active">À traiter</button>
-      <button data-view="campaigns" class="nav-btn">Campagne</button>
-      <button data-view="herds" class="nav-btn">Éleveurs</button>
-      <button data-view="imports" class="nav-btn">Imports</button>
-      <button data-view="exports" class="nav-btn">Exports</button>
-      <button data-view="balance" class="nav-btn">Bilan & récap</button>
-      <button data-view="settings" class="nav-btn">Paramètres</button>
-    </nav>
-
-    <main id="app" class="content"></main>
+    <label>Email<input id="loginEmail" type="email" autocomplete="username"></label>
+    <label>Mot de passe<input id="loginPassword" type="password" autocomplete="current-password"></label>
+    <button class="primary big" onclick="signIn()">Se connecter</button>
+    <button class="linkButton" onclick="toggleCloudConfig()">Configurer Supabase sur cet appareil</button>
+    <div id="loginMessage" class="loginMessage"></div>
   </div>
-
-  <div id="toast" class="toast" hidden></div>
-  <div id="modal" class="modal" hidden><div class="modal-card"><button id="modalClose" class="modal-close">×</button><div id="modalBody"></div></div></div>
-
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="history_seed.js"></script>
-  <script src="app.js"></script>
-</body>
-</html>
+</div>
+<header class="compactHeader">
+  <img class="appLogo" src="app-logo.png?v=4.0.24" alt="Suivi Parage">
+  <div class="headerTitle"><h1>Suivi Parage</h1><small>Chantiers, historique, pro forma et comptabilité</small></div>
+  <div class="modeSwitch" id="modeSwitch" hidden>
+    <button id="terrainModeBtn" type="button" onclick="setUIMode('terrain')">Terrain</button>
+    <button id="officeModeBtn" type="button" onclick="setUIMode('office')">Bureau</button>
+  </div>
+  <div class="headerStatus">
+    <span id="syncBadge" class="syncBadge pending">Local</span>
+    <span class="versionBadge">v4.0.21</span>
+    <span id="userBadge" class="userBadge"></span>
+    <button id="logoutBtn" class="logoutBtn" onclick="signOut()" hidden>Déconnexion</button>
+  </div>
+  <button id="installBtn" hidden>Installer</button>
+</header>
+<nav id="nav"><button data-view="home" class="active" data-modes="terrain,office" data-roles="admin,pareuse,comptable,technicien">Accueil</button><button data-view="chantier" data-modes="terrain,office" data-roles="admin,pareuse">Nouveau chantier</button><button data-view="history" data-modes="terrain,office" data-roles="admin,pareuse,comptable,technicien">Historique</button><button data-view="accounting" data-modes="office" data-roles="admin,pareuse,comptable,technicien">Comptabilité</button><button data-view="exports" data-modes="terrain,office" data-roles="admin,pareuse,comptable">Fichiers</button><button data-view="stats" data-modes="office" data-roles="admin,pareuse,comptable,technicien">Bilans</button><button data-view="addresses" data-modes="office" data-roles="admin">Adresses</button><button data-view="users" data-modes="office" data-roles="admin">Utilisateurs</button><button data-view="journal" data-modes="office" data-roles="admin">Journal</button><button data-view="settings" data-modes="office" data-roles="admin">Paramètres</button></nav>
+<main>
+<section id="home" class="view active"><div class="hero"><h2>Bonjour</h2><p>Créez un chantier, saisissez les bovins sur le schéma des pieds, puis éditez la pro forma et l'export comptable.</p><button class="primary big" onclick="showView('chantier')">Démarrer un chantier</button></div><div id="homeCards" class="cards"></div></section>
+<section id="chantier" class="view">
+  <div id="chantierStart" class="chantierStart panel">
+    <div class="startIcon">▶</div>
+    <h2>Aucun chantier démarré</h2>
+    <p>La date et l'heure de début seront enregistrées au moment exact où vous démarrez.</p>
+    <button class="primary big startJobButton" type="button" onclick="startNewJob()">Démarrer un nouveau chantier</button>
+    <div class="startHelp">Le formulaire ne s'affichera qu'après le démarrage du chantier.</div>
+  </div>
+  <div id="chantierForm" hidden>
+    <div class="toolbar"><h2>Chantier en cours</h2><button type="button" onclick="cancelCurrentJob()">Annuler</button><button class="primary" onclick="saveJob()">Enregistrer</button></div>
+    <div class="panel grid2"><label>N° cheptel<input id="cheptel" inputmode="numeric" list="clientsList" placeholder="Ex. 65001016"></label><datalist id="clientsList"></datalist><label>Élevage<input id="clientName"></label><label>Adresse<input id="address"></label><label>CP et commune<input id="cpVille"></label><label>Département<input id="department"></label><div class="addressActions"><button type="button" onclick="saveAddressOverride()">Enregistrer cette adresse corrigée</button><button type="button" onclick="restoreBaseAddress()">Reprendre l’adresse de base</button></div><label>Race<input id="race" list="races"></label><datalist id="races"></datalist><label>Date<input id="jobDate" type="date"></label><label>Heure début<input id="startTime" type="time"></label><label>Heure fin<input id="endTime" type="time" readonly></label></div>
+    <div id="farmOverview"></div><div id="paymentAlert"></div><div id="animalsToReviewAlert"></div>
+    <div class="panel"><div class="toolbar"><h3>Bovins</h3><button class="primary" onclick="addAnimal()">+ Ajouter un bovin</button></div><div id="animals"></div></div>
+    <div class="panel"><div class="toolbar"><h3>Récapitulatif tarifaire du chantier</h3><button id="editRatesBtn" onclick="toggleRateEditing()">Modifier un tarif</button></div><div id="pricingSummary"></div><div id="rateEditing" class="grid3" hidden><label>Déplacement / mise en place (€ HT)<input id="fee" type="number" step="0.01"></label><label>Tarif paire (€ HT)<input id="jobPairRate" type="text" inputmode="decimal"></label><label>Tarif pied seul (€ HT)<input id="jobFootRate" type="text" inputmode="decimal"></label><label>Tarif pansement (€ HT)<input id="jobBandageRate" type="text" inputmode="decimal"></label><label>Tarif talonnette (€ HT)<input id="jobBlockRate" type="text" inputmode="decimal"></label></div><label>Commentaire chantier<textarea id="jobComment"></textarea></label></div>
+    <div class="panel grid2"><label>Modalité de paiement<select id="paymentTiming"><option>À réception</option><option>Sur place</option></select></label><label>Mode de règlement<select id="paymentMethod"><option value="">À définir</option><option>Chèque</option><option>Espèces</option><option>Virement</option></select></label></div><div class="panel"><label>Commentaire pour la comptabilité<textarea id="accountingComment" placeholder="Information utile pour la comptable : règlement, facturation, particularité du dossier…"></textarea></label><p class="hint">Ce commentaire reste attaché au chantier et apparaît dans la vue Comptabilité.</p></div>
+    <div id="jobTotals" class="totals"></div><div class="actions bottomActions"><button onclick="printProforma()">Aperçu pro forma</button><button id="validateJobBtn" class="primary big" onclick="finishJob()">Valider le chantier</button></div>
+  </div>
+</section>
+<section id="history" class="view"><div class="toolbar"><h2>Historique</h2><input id="historySearch" placeholder="Cheptel, élevage ou bovin" oninput="renderHistory()"></div><div id="historyList"></div></section>
+<section id="accounting" class="view">
+  <div class="toolbar"><h2>Comptabilité — vue globale</h2><button onclick="selectAllAccounting()">Tout sélectionner</button><button class="primary big" onclick="sendAccountingDay()">Envoyer les dossiers sélectionnés</button></div>
+  <div class="panel accountingFilters">
+    <div class="grid3">
+      <label>Du<input id="accountingStart" type="date" onchange="handleAccountingCriteriaChangeV406()"></label>
+      <label>Au<input id="accountingEnd" type="date" onchange="handleAccountingCriteriaChangeV406()"></label>
+      <label>Recherche<input id="accountingSearch" placeholder="Éleveur, cheptel, facture…" oninput="handleAccountingCriteriaChangeV406()"></label>
+    </div>
+    <div class="toolbar accountingQuickFilters"><b>Afficher :</b><button data-accounting-filter="all" class="primary" onclick="setAccountingFilterV403('all')">Tout</button><button data-accounting-filter="to_invoice" onclick="setAccountingFilterV403('to_invoice')">À facturer</button><button data-accounting-filter="open" onclick="setAccountingFilterV403('open')">À encaisser</button><button data-accounting-filter="late" onclick="setAccountingFilterV403('late')">Impayés</button><button data-accounting-filter="paid" onclick="setAccountingFilterV403('paid')">Réglés</button><button type="button" onclick="resetAccountingFiltersV406()">Réinitialiser les filtres</button></div>
+  </div>
+  <div id="accountingCards" class="cards accountingDashboardCards"></div>
+  <div id="accountingDetailHost"></div>
+  <div id="accountingSummary" class="panel"></div>
+  <div class="panel accountingLegend"><span class="status pending">À facturer</span><span class="status sent">Pro forma transmise</span><span class="status invoiced">Facturée / en attente</span><span class="status paid">Réglée</span><span class="status late">Impayée / retard</span></div>
+  <div id="accountingList"></div>
+</section>
+<section id="exports" class="view"><div class="toolbar"><h2>Fichiers générés et sauvegardes</h2><button onclick="backupData()">Exporter une sauvegarde</button></div><p class="hint archiveNote">Les pro formas et ZIP créés restent accessibles ici pour les ouvrir ou les partager à nouveau.</p><div id="archiveStatus" class="archiveStatus"></div><div id="exportList" hidden></div><div class="panel"><h3>Fichiers générés</h3><div id="generatedFilesList"></div></div></section>
+<section id="stats" class="view">
+  <div class="toolbar"><h2>Bilans</h2><button id="technicalTab" class="primary" onclick="showBalanceTab('technical')">Bilan technique</button><button id="economicTab" onclick="showBalanceTab('economic')">Bilan économique</button><button onclick="exportFilteredBalance()">Exporter le résultat</button></div>
+  <div class="panel filtersPanel">
+    <h3>Filtres</h3>
+    <div class="grid3">
+      <label>Date de début<input id="filterStart" type="date" onchange="renderStats()"></label>
+      <label>Date de fin<input id="filterEnd" type="date" onchange="renderStats()"></label>
+      <label>Département<select id="filterDepartment" onchange="renderStats()"><option value="">Tous</option></select></label>
+      <label>Race<select id="filterRace" onchange="renderStats()"><option value="">Toutes</option></select></label>
+      <label>Catégorie<select id="filterCategory" onchange="renderStats()"><option value="">Toutes</option><option value="V">Vache</option><option value="Gén">Génisse</option><option value="JB">JB</option><option value="T">Taureau</option><option value="B">Broutard</option></select></label>
+      <label>Problème<select id="filterIssue" onchange="renderStats()"><option value="">Tous</option></select></label>
+      <label>Soin<select id="filterCare" onchange="renderStats()"><option value="">Tous</option></select></label>
+      <label>Exploitation<input id="filterFarm" placeholder="Nom ou cheptel" oninput="renderStats()"></label>
+      <label>Commune<input id="filterTown" placeholder="Commune" oninput="renderStats()"></label>
+    </div>
+    <button onclick="resetBalanceFilters()">Réinitialiser les filtres</button>
+  </div>
+  <div id="technicalBalance">
+    <div id="technicalCards" class="cards"></div>
+    <div id="technicalTables"></div>
+  </div>
+  <div id="economicBalance" hidden>
+    <div id="economicCards" class="cards"></div>
+    <div class="panel"><h3>Coût de la tournée / frais</h3>
+      <div class="grid3">
+        <label>Point de départ<input id="routeStart" value="Pontis-de-Rivière (31)" onchange="scheduleAutomaticRoute(true)"></label>
+        <label>Kilomètres retenus<input id="routeKm" type="number" step="0.1" min="0" oninput="markRouteAsManual();renderStats()"></label>
+        <label>Coût kilométrique (€ / km)<input id="routeKmRate" type="number" step="0.01" min="0" oninput="renderStats()"></label>
+        <label>Carburant saisi séparément (€)<input id="costFuel" type="number" step="0.01" oninput="renderStats()"></label>
+        <label>Péage (€)<input id="costToll" type="number" step="0.01" oninput="renderStats()"></label>
+        <label>Matériel / entretien (€)<input id="costMaterial" type="number" step="0.01" oninput="renderStats()"></label>
+        <label>Repas (€)<input id="costMeals" type="number" step="0.01" oninput="renderStats()"></label>
+        <label>Autres frais (€)<input id="costOther" type="number" step="0.01" oninput="renderStats()"></label>
+        <label>Commentaire<input id="costComment"></label>
+      </div>
+      <label><input id="routeReturnHome" type="checkbox" checked disabled> Chaque jour : départ du domicile et retour au domicile inclus</label>
+      <div class="routeActions"><button class="primary" type="button" onclick="estimateFilteredRoutes(true)">Calculer automatiquement la tournée</button><button type="button" onclick="markRouteAsManual()">Conserver le kilométrage saisi</button><button onclick="saveCosts()">Enregistrer les frais et kilomètres</button></div>
+      <div id="routeEstimateStatus" class="routeEstimateStatus">L’estimation utilise les adresses des chantiers filtrés. Elle reste modifiable manuellement.</div>
+      <div id="routeEstimateDetails"></div>
+    </div>
+    <div id="economicTables"></div>
+  </div>
+</section>
+<section id="addresses" class="view"><div class="toolbar"><h2>Corrections d’adresses</h2><button onclick="exportAddressOverrides()">Exporter les adresses saisies</button><label class="fileBtn">Mise à jour base adresses<input type="file" accept=".json,.csv,text/csv,application/json" onchange="importAddressBase(event)"></label></div><p class="hint">Les adresses saisies à la main restent prioritaires. Une mise à jour de la base clients ne les remplace pas.</p><div id="addressOverrideList"></div></section>
+<section id="users" class="view"><div class="toolbar"><h2>Utilisateurs</h2><button onclick="refreshUsers()">Actualiser</button></div><div class="panel"><p>Les comptes sont créés dans Supabase Authentication. Ici, l’administratrice attribue ensuite le rôle correspondant.</p><div id="usersList"></div></div></section>
+<section id="journal" class="view"><div class="toolbar"><h2>Journal d’activité</h2><input id="journalSearch" placeholder="Utilisateur, élevage, action…" oninput="renderAuditLog()"><button onclick="exportAuditLog()">Exporter CSV</button></div><div class="panel grid3"><label>Date de début<input id="journalStart" type="date" onchange="renderAuditLog()"></label><label>Date de fin<input id="journalEnd" type="date" onchange="renderAuditLog()"></label><label>Type d’action<select id="journalType" onchange="renderAuditLog()"><option value="">Toutes</option><option>Chantier</option><option>Comptabilité</option><option>Adresse</option><option>Paramètres</option><option>Synchronisation</option></select></label></div><div id="journalList"></div></section>
+<section id="settings" class="view"><h2>Paramètres</h2><div class="panel grid2"><label>TVA (%)<input id="vat" type="number" step="0.01"></label><label>Forfait par défaut (€ HT)<input id="defaultFee" type="number" step="0.01"></label><label>Paire de pieds, 1 bovin (€ HT)<input id="pairOne" type="number" step="0.01"></label><label>Paire de pieds, ≥2 bovins (€ HT)<input id="pairMany" type="number" step="0.01"></label><label>Pied à l'unité, 1 bovin (€ HT)<input id="footOne" type="number" step="0.01"></label><label>Pied à l'unité, ≥2 bovins (€ HT)<input id="footMany" type="number" step="0.01"></label><label>Pansement (€ HT)<input id="bandagePrice" type="number" step="0.01"></label><label>Talonnette (€ HT)<input id="blockPrice" type="number" step="0.01"></label><label>Nom / entreprise<input id="businessName"></label><label>Coordonnées<textarea id="businessDetails"></textarea></label><label>Email comptabilité<input id="accountingEmail" type="email" placeholder="comptabilite@exemple.fr"></label><label>URL Supabase (sauvegarde en ligne)<input id="supabaseUrl" placeholder="https://xxxx.supabase.co"></label><label>Clé publique Supabase<input id="supabaseKey" type="password" placeholder="anon public key"></label><label>Point de départ des tournées<input id="defaultRouteStart" value="Pontis-de-Rivière (31)"></label><label>Coût kilométrique par défaut (€ / km)<input id="defaultKmRate" type="number" step="0.01" value="0.65"></label></div><button class="primary" onclick="saveSettings()">Enregistrer les paramètres</button><div class="panel"><h3>Sauvegarde</h3><button onclick="backupData()">Exporter une sauvegarde</button><button onclick="cloudBackup(true)">Synchroniser maintenant</button><button onclick="cloudRestore()">Restaurer depuis la sauvegarde en ligne</button><label class="fileBtn">Importer une sauvegarde<input type="file" accept="application/json" onchange="restoreData(event)"></label></div></section>
+</main><div id="toast"></div><script src="app.js?v=4.0.24"></script></body></html>
