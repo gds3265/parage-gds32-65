@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.24');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.25');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.24').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.25').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -3507,7 +3507,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.24',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.25',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3616,7 +3616,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.24',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.25',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3846,7 +3846,7 @@ let parageReloadingV419=false;
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.24',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.25',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -4255,3 +4255,136 @@ window.addEventListener('scroll',()=>closeJobMenusV424(),{passive:true});
 function updateV424Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.24');document.title='Suivi Parage v4.0.24';}
 const initV424Base=init;init=async function(){const r=await initV424Base();updateV424Identity();return r;};
 setTimeout(updateV424Identity,0);setTimeout(updateV424Identity,1500);setTimeout(updateV424Identity,8000);
+
+/* =====================================================================
+   V4.0.25 — dermatite au pied + commentaires pro forma + historique compta massif
+   - Dermatite interdigitée : Plaie + Pansement + commentaire directement au pied.
+   - Tous les commentaires terrain remontent sur la pro forma ; accountingComment reste interne.
+   - Les historiques importés peuvent être marqués transmis en masse sans générer des centaines de PDF.
+   ===================================================================== */
+const APP_VERSION_V425='4.0.25';
+
+function footDetailV425(animal,code){
+  if(!animal.footDetailsV425||typeof animal.footDetailsV425!=='object')animal.footDetailsV425={};
+  if(!animal.footDetailsV425[code]||typeof animal.footDetailsV425[code]!=='object')animal.footDetailsV425[code]={wound:false,bandage:false,note:''};
+  return animal.footDetailsV425[code];
+}
+function setFootDetailV425(animalId,code,key,value){
+  const a=current?.animals?.find(x=>x.id===animalId);if(!a)return;
+  const d=footDetailV425(a,code);d[key]=key==='note'?String(value||''):!!value;
+  ensureWorkedFeet(a);if(!a.workedFeet.includes(code))a.workedFeet.push(code);
+  saveDraftSilently?.();
+  if(key!=='note')renderAnimals();
+  renderTotals?.();
+}
+
+/* Un pied avec dermatite peut recevoir directement plaie/pansement/commentaire. */
+footHTML=function(animal,code,label){
+  syncLegacyAnimal(animal);ensureWorkedFeet(animal);
+  const worked=animal.workedFeet.includes(code),photos=footPhotosV4(animal,code),previous=previousFootInfoV4(animal,code),derm=hasFootDermatitisV415(animal,code),fd=footDetailV425(animal,code);
+  const previousIcons=previous?`${previous.photo?'📷 ':''}${previous.bandage?'🩹 ':''}${previous.block?'◼️ ':''}`:'';
+  return `<div class="foot ${worked?'worked':''} ${previous?'previousFoot':''}"><h4>${label}${previous?` <span class="previousFootMark" title="Pied traité le ${fmtDate(previous.date)}">↶ ${fmtDate(previous.date)} ${previousIcons}</span>`:''}</h4><button class="footDone ${worked?'on':''}" onclick="toggleFoot('${animal.id}','${code}')">${worked?'✓ Pied fait':'Marquer le pied fait'}</button><button type="button" class="footDermatitis ${derm?'on':''}" onclick="toggleFootDermatitisV415('${animal.id}','${code}')">${derm?'✓ Dermatite':'Dermatite entre les onglons'}</button>${derm?`<div class="dermatitisExtrasV425"><b>Dermatite :</b><label><input type="checkbox" ${fd.wound?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','wound',this.checked)"> Plaie</label><label><input type="checkbox" ${fd.bandage?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','bandage',this.checked)"> Pansement</label><label class="dermatitisNoteV425">Commentaire<input value="${esc(fd.note||'')}" oninput="setFootDetailV425('${animal.id}','${code}','note',this.value)" placeholder="Observation sur la dermatite / plaie"></label></div>`:''}<div class="claws">${['Int','Ext'].map(side=>{const key=code+'-'+side,d=animal.claws[key]||{},cls=(d.issues?.length||d.care?.length||String(d.note||'').trim())?'problem':'';return `<button class="claw ${cls}" onclick="editClaw('${animal.id}','${key}')"><b>${side==='Int'?'Interne':'Externe'}</b><br><small>${[...(d.issues||[]),...(d.care||[])].slice(0,2).join(', ')||d.note||'Autre problème / soin'}</small></button>`;}).join('')}</div><div class="footPhotoBar"><button type="button" class="photoBtn" onclick="addFootPhotoV4('${animal.id}','${code}')">📷 Photo du pied</button>${photos.length?`<span class="photoCount">${photos.length} photo${photos.length>1?'s':''}</span>`:''}</div><div class="footPhotos">${photos.map(p=>`<div class="footPhoto"><img src="${p.data}" alt="Photo du pied" onclick="openFootPhotoV4('${animal.id}','${code}','${p.id}')"><button type="button" title="Supprimer" onclick="event.stopPropagation();removeFootPhotoV4('${animal.id}','${code}','${p.id}')">×</button></div>`).join('')}</div></div>`;
+};
+
+const hasAnimalContentV425Base=hasAnimalContent;
+hasAnimalContent=function(a){
+  if(hasAnimalContentV425Base(a))return true;
+  return Object.values(a?.footDetailsV425||{}).some(d=>d&&(d.wound||d.bandage||String(d.note||'').trim()));
+};
+
+/* Pansement posé directement sur une dermatite = acte compté exactement comme les autres. */
+animalCountsV424=function(animal){
+  syncLegacyAnimal(animal);ensureWorkedFeet(animal);
+  const worked=new Set(animal.workedFeet||[]);let pairs=0,pairedFeet=0,band=0,blocks=0;
+  if(worked.has('PAvG')&&worked.has('PAvD')){pairs++;pairedFeet+=2;}
+  if(worked.has('PArG')&&worked.has('PArD')){pairs++;pairedFeet+=2;}
+  const single=Math.max(0,worked.size-pairedFeet);
+  for(const d of Object.values(animal.claws||{})){
+    if((d.care||[]).includes('Pansement'))band++;
+    if((d.care||[]).includes('Talonnette'))blocks++;
+  }
+  for(const d of Object.values(animal.footDetailsV425||{}))if(d?.bandage)band++;
+  return {pairs,single,band,blocks};
+};
+
+function fieldNotesV425(a){
+  const notes=[];
+  for(const [key,d] of Object.entries(a?.claws||{}))if(String(d?.note||'').trim())notes.push(`${key}: ${String(d.note).trim()}`);
+  const fl=Object.fromEntries(feet);
+  for(const [code,d] of Object.entries(a?.footDetailsV425||{}))if(String(d?.note||'').trim())notes.push(`${fl[code]||code}: ${String(d.note).trim()}`);
+  if(String(a?.notes||'').trim())notes.push(String(a.notes).trim());
+  return notes;
+}
+
+function makeProformaPdfV425(job){
+  const c=calc(job),fl=Object.fromEntries(feet),pageW=595,margin=34,ax=[34,72,120,210,340,435,561];
+  const animalRows=(job.animals||[]).filter(hasAnimalContent).map(a=>{
+    ensureWorkedFeet(a);const probs=[],soins=new Set(),notes=fieldNotesV425(a);
+    for(const [k,d] of Object.entries(a.claws||{})){
+      if((d.issues||[]).length)probs.push(`${k}: ${(d.issues||[]).join(', ')}`);
+      for(const x of(d.care||[]))if(x==='Pansement'||x==='Talonnette')soins.add(x);
+    }
+    for(const code of Object.keys(a.footIssues||{}))if((a.footIssues[code]||[]).includes('Dermatite'))probs.push(`${fl[code]||code}: Dermatite (entre les onglons)`);
+    for(const [code,d] of Object.entries(a.footDetailsV425||{})){
+      if(d?.wound)probs.push(`${fl[code]||code}: Plaie (dermatite)`);
+      if(d?.bandage)soins.add(`Pansement ${fl[code]||code}`);
+    }
+    const gift=giftSummaryV424(a);if(gift)soins.add('OFFERT: '+gift.replace(/^Offert : /,''));
+    const vals=[a.number||'-',categoryLabels[a.category]||a.category||'-',(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')||'-',probs.join('; ')||'RAS',[...soins].join(', ')||'-',notes.join(' ; ')||'-'];
+    const wrapped=vals.map((v,i)=>pdfWrap311(v,[5,7,13,20,14,19][i]));const lines=Math.max(...wrapped.map(v=>v.length),1);
+    return {a,wrapped,h:Math.max(20,lines*9+5)+(a.checkNext?15:0)};
+  });
+  const pages=[];let remaining=[...animalRows],first=true;const firstStartY=372,nextStartY=730,bottomReserve=96;
+  while(remaining.length||pages.length===0){let y=first?firstStartY:nextStartY,rows=[];while(remaining.length){const r=remaining[0];if(y-r.h<bottomReserve&&rows.length)break;if(y-r.h<bottomReserve&&!rows.length){rows.push(remaining.shift());break;}rows.push(remaining.shift());y-=r.h;}pages.push({first,rows});first=false;}
+  const streams=pages.map((page,pageIndex)=>{const cmds=[];const text=(x,y,size,value,bold=false)=>cmds.push(`BT /${bold?'F2':'F1'} ${size} Tf ${x} ${y} Td (${pdfEsc311(value)}) Tj ET`);const line=(x1,y1,x2,y2,w=.6)=>cmds.push(`${w} w ${x1} ${y1} m ${x2} ${y2} l S`);const rect=(x,y,w,h)=>cmds.push(`${x} ${y} ${w} ${h} re S`);const fillRect=(x,y,w,h,g=.95)=>cmds.push(`${g} g ${x} ${y} ${w} ${h} re f 0 g`);let y;
+    if(page.first){cmds.push('q 185 0 0 53 34 779 cm /Im1 Do Q');text(250,807,9.5,`PRO FORMA / COMPTE RENDU - ${(job.clientName||'').slice(0,28)}`,true);line(margin,772,pageW-margin,772,1.2);rect(margin,692,250,64);rect(310,692,251,64);text(44,740,9,'GDS Gers Hautes-Pyrenees',true);text(44,726,8,'3 chemin de la Caillaouere');text(44,714,8,'32000 AUCH');text(320,740,9,`Eleveur : ${job.clientName||''}`,true);text(320,726,8,`Cheptel : ${job.cheptel||''}`);text(320,714,8,`${job.address||''}`);text(320,702,8,`${job.cpVille||''}`);text(margin,676,9,`Date : ${fmtDate(job.date)}    Heure : ${job.start||''} - ${job.end||''}`,true);text(margin,657,11,'Prestations',true);
+      const tx=[34,300,365,445,561],top=644,rowH=22;fillRect(tx[0],top-rowH,tx[4]-tx[0],rowH,.92);rect(tx[0],top-rowH,tx[4]-tx[0],rowH);tx.slice(1,-1).forEach(x=>line(x,top-rowH,x,top));['Prestation','Qte','Tarif HT','Total HT'].forEach((h,i)=>text(tx[i]+5,top-15,8,h,true));
+      const priceRows=[['Deplacement / mise en place','1',c.fee,c.fee],['Paires de pieds',pdfQtyV424(c.pairs,c.freePairs),c.pairRate,c.billPairs*c.pairRate],['Pieds seuls',pdfQtyV424(c.single,c.freeSingle),c.footRate,c.billSingle*c.footRate],['Pansements',pdfQtyV424(c.band,c.freeBand),c.bandageRate,c.billBand*c.bandageRate],['Talonnettes',pdfQtyV424(c.blocks,c.freeBlocks),c.blockRate,c.billBlocks*c.blockRate]];
+      priceRows.forEach((r,i)=>{const ry=top-rowH*(i+2);rect(tx[0],ry,tx[4]-tx[0],rowH);tx.slice(1,-1).forEach(x=>line(x,ry,x,ry+rowH));text(tx[0]+5,ry+7,8,r[0]);text(tx[1]+7,ry+7,7.5,r[1]);text(tx[2]+5,ry+7,8,pdfMoney311(r[2]));text(tx[3]+5,ry+7,8,pdfMoney311(r[3]));});
+      y=top-rowH*(priceRows.length+2);[['TOTAL HT',c.ht],['TVA '+c.vat+' %',c.ttc-c.ht],['TOTAL TTC',c.ttc]].forEach((r,i)=>{rect(365,y-rowH*i,196,rowH);line(445,y-rowH*i,445,y-rowH*i+rowH);text(371,y-rowH*i+7,8,r[0],true);text(451,y-rowH*i+7,8,pdfMoney311(r[1]),true);});y-=rowH*3+16;text(margin,y,11,'Recapitulatif de l intervention',true);y-=16;
+    }else{cmds.push('q 150 0 0 43 34 785 cm /Im1 Do Q');text(225,807,11,'PRO FORMA / COMPTE RENDU DE PARAGE - SUITE',true);text(margin,766,8.5,`${job.clientName||''} - Cheptel ${job.cheptel||''} - ${fmtDate(job.date)}`,true);line(margin,754,pageW-margin,754,1);text(margin,744,10,'Recapitulatif de l intervention (suite)',true);y=730;}
+    const headerY=y;fillRect(ax[0],headerY-20,ax[6]-ax[0],20,.92);rect(ax[0],headerY-20,ax[6]-ax[0],20);ax.slice(1,-1).forEach(x=>line(x,headerY-20,x,headerY));['N bovin','Categorie','Pieds','Problemes','Soins','Observations'].forEach((h,i)=>text(ax[i]+3,headerY-13,7,h,true));y=headerY-20;
+    for(const r of page.rows){const baseH=r.h-(r.a.checkNext?15:0);rect(ax[0],y-baseH,ax[6]-ax[0],baseH);ax.slice(1,-1).forEach(x=>line(x,y-baseH,x,y));r.wrapped.forEach((ls,i)=>ls.forEach((t,j)=>text(ax[i]+3,y-11-j*9,6.7,t)));y-=baseH;if(r.a.checkNext){fillRect(ax[0],y-15,ax[6]-ax[0],15,.96);rect(ax[0],y-15,ax[6]-ax[0],15);text(ax[0]+5,y-10,7,'BOVIN A CONTROLER A LA PROCHAINE VISITE',true);y-=15;}}
+    if(pageIndex===pages.length-1){const jobNote=String(job.comment||'').trim();if(jobNote){const noteLines=pdfWrap311('Commentaire chantier : '+jobNote,86).slice(0,4);noteLines.forEach((t,i)=>text(margin,88-i*9,7.5,t,i===0));}text(margin,48,8,`Modalite : ${job.paymentTiming||'A reception'}     Mode : ${job.paymentMethod||'A definir'}`,true);text(margin,35,7.2,'Paiement a 20 jours - IBAN FR76 1690 6010 2003 4001 9914 139 - BIC AGRIFRPP869');}
+    text(500,20,7,`Page ${pageIndex+1}/${pages.length}`);return cmds.join('\n');
+  });
+  const objects=[],pageObjNums=[],contentObjNums=[];let next=3;for(let i=0;i<streams.length;i++){pageObjNums.push(next++);contentObjNums.push(next++);}const font1=next++,font2=next++,image=next++;objects[1]='<< /Type /Catalog /Pages 2 0 R >>';objects[2]=`<< /Type /Pages /Kids [${pageObjNums.map(n=>n+' 0 R').join(' ')}] /Count ${streams.length} >>`;for(let i=0;i<streams.length;i++){objects[pageObjNums[i]]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${font1} 0 R /F2 ${font2} 0 R >> /XObject << /Im1 ${image} 0 R >> >> /Contents ${contentObjNums[i]} 0 R >>`;objects[contentObjNums[i]]=`<< /Length ${streams[i].length} >>\nstream\n${streams[i]}\nendstream`;}objects[font1]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';objects[font2]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';objects[image]=`<< /Type /XObject /Subtype /Image /Width 737 /Height 212 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter [/ASCIIHexDecode /DCTDecode] /Length ${GDS_LOGO_JPEG_HEX_312.length} >>\nstream\n${GDS_LOGO_JPEG_HEX_312}\nendstream`;return buildPdf311(objects);
+}
+makeProformaPdfV424=makeProformaPdfV425;
+proformaPdfBlob=function(job){return new Blob([makeProformaPdfV425(job)],{type:'application/pdf'});};
+
+/* Les commentaires de terrain sont aussi repris dans l'export comptable.
+   accountingComment reste exclusivement destiné à la comptabilité et n'est pas imprimé sur la pro forma. */
+const buildAccountingXmlV425Base=buildAccountingXml;
+buildAccountingXml=function(rows){
+  const headers=['mois intervention','Date','Cheptel','Nom PRENOM','Adresse','CP + VILLE','Race','taureau fait  ?','DEPARTEMENT','FORFAIT + MISE EN PLACE','NBR Animaux totaux','NBR DE PAIRE','PIED à l\'unité','NBR DE PANSEMENT','NBR DE TALONNETTE','MONTANT SOIN TOTAUX','PRIX HT','PRIX TTC','Commentaires','Devis','FACTURE LE','Réglé le','TYPE'];
+  let xml=`<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="saisie"><Table>${xmlRow(headers)}`;
+  for(const j of rows){const c=calc(j),month=String(j.date||'').slice(0,7)+'-01';const terrain=[];if(String(j.comment||'').trim())terrain.push(j.comment);for(const a of(j.animals||[])){const n=fieldNotesV425(a);if(n.length)terrain.push(`${a.number||'Bovin'} : ${n.join(' / ')}`);if(a.checkNext)terrain.push(`À revoir ${a.number||''}`);}if(String(j.accountingComment||'').trim())terrain.push(`COMPTA : ${j.accountingComment}`);xml+=xmlRow([month,j.date,j.cheptel,j.clientName,j.address,j.cpVille,j.race,((j.animals||[]).some(a=>a.category==='T')?'oui':'non'),j.department,j.fee,c.n,c.pairs,c.single,c.band,c.blocks,c.careTotal,c.ht,c.ttc,terrain.join(' | '),j.date,'','',`${j.paymentTiming||''} - ${j.paymentMethod||''}`]);}
+  return xml+'</Table></Worksheet></Workbook>';
+};
+
+/* Transmission massive : les dossiers d'historique ont déjà existé avant l'appli.
+   On les marque comme transmis sans fabriquer un PDF pour chacun. */
+sendAccountingDay=async function(){
+  const ids=[...document.querySelectorAll('.accountingCheck:checked')].map(x=>x.value),rows=jobs.filter(j=>ids.includes(j.id));
+  if(!rows.length)return toast('Sélectionnez au moins un chantier');
+  const hist=rows.filter(j=>j.importedHistory===true),live=rows.filter(j=>j.importedHistory!==true),stamp=new Date().toISOString();
+  if(hist.length){for(const j of hist){j.accountingSentAt=j.accountingSentAt||stamp;j.exportedAt=j.exportedAt||j.accountingSentAt;if(!j.paymentStatus||j.paymentStatus==='pending')j.paymentStatus='sent';touchJobV413?.(j);}saveAll();}
+  if(!live.length){await cloudBackup(false);renderAccounting();renderExports();return toast(`${hist.length} dossier(s) d’historique marqué(s) « Pro forma transmise »`);}
+  const batchSize=25,batches=[];for(let i=0;i<live.length;i+=batchSize)batches.push(live.slice(i,i+batchSize));
+  const created=[];
+  for(let bi=0;bi<batches.length;bi++){
+    const batch=batches[bi],day=batch[0].date||today(),files=[{name:`Export_comptable_${day}.xls`,data:buildAccountingXml(batch)}];
+    for(const j of batch){const safe=(j.cheptel||'sans_cheptel').replace(/[^a-zA-Z0-9_-]/g,'_');files.push({name:`Proformas/Proforma_${safe}_${j.date}.pdf`,data:new Uint8Array(await proformaPdfBlob(j).arrayBuffer())});}
+    const zip=zipStore(files),suffix=batches.length>1?`_lot_${bi+1}_sur_${batches.length}`:'',name=`Compta_parage_${day}${suffix}.zip`;await storeGeneratedFile(name,zip,'zip');created.push({zip,name,batch});
+  }
+  /* Un seul lot : comportement habituel de partage. Plusieurs lots : conservés dans Fichiers générés,
+     ce qui évite les plantages et les dizaines de boîtes de partage successives. */
+  if(created.length===1){const x=created[0],file=new File([x.zip],x.name,{type:'application/zip'});let shared=false;if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({title:'Parage - comptabilité',text:`${x.batch.length} chantier(s) de parage`,files:[file]});shared=true;}catch(e){}}else{download(x.zip,x.name);shared=true;}if(shared){for(const j of x.batch){j.accountingSentAt=stamp;j.exportedAt=stamp;if(!j.paymentStatus||j.paymentStatus==='pending')j.paymentStatus='sent';touchJobV413?.(j);}}}
+  else{for(const x of created)for(const j of x.batch){j.accountingSentAt=stamp;j.exportedAt=stamp;if(!j.paymentStatus||j.paymentStatus==='pending')j.paymentStatus='sent';touchJobV413?.(j);}toast(`${created.length} ZIP créés par lots de ${batchSize}, disponibles dans Fichiers générés`);}
+  saveAll();await cloudBackup(false);renderAccounting();renderExports();if(hist.length)toast(`${hist.length} historique(s) + ${live.length} chantier(s) traités`);
+};
+
+function updateV425Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.25');document.title='Suivi Parage v4.0.25';}
+const initV425Base=init;init=async function(){const r=await initV425Base();updateV425Identity();return r;};
+setTimeout(updateV425Identity,0);setTimeout(updateV425Identity,1500);setTimeout(updateV425Identity,8000);
