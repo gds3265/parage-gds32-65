@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.25');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.26');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.25').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.26').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -3507,7 +3507,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.25',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.26',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3616,7 +3616,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.25',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.26',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3840,13 +3840,13 @@ setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(
    - Recharge automatique dès qu'un nouveau service worker prend le contrôle.
    - Aucune donnée métier/localStorage n'est effacée.
    ===================================================================== */
-const APP_VERSION_V419='4.0.24';
+const APP_VERSION_V419='4.0.26';
 let parageReloadingV419=false;
 
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.25',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.26',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -4388,3 +4388,30 @@ sendAccountingDay=async function(){
 function updateV425Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.25');document.title='Suivi Parage v4.0.25';}
 const initV425Base=init;init=async function(){const r=await initV425Base();updateV425Identity();return r;};
 setTimeout(updateV425Identity,0);setTimeout(updateV425Identity,1500);setTimeout(updateV425Identity,8000);
+
+
+/* =====================================================================
+   V4.0.26 — correctif boucle PWA / identité de version
+   - La version distante et la version comparée sont désormais identiques.
+   - Verrouille le badge et le titre sur la version finale malgré les anciens
+     modules de migration qui réappliquent brièvement leur ancien numéro.
+   ===================================================================== */
+const APP_VERSION_V426='4.0.26';
+function enforceV426Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>{
+    if(x.textContent!=='v'+APP_VERSION_V426)x.textContent='v'+APP_VERSION_V426;
+  });
+  const wanted='Suivi Parage v'+APP_VERSION_V426;
+  if(document.title!==wanted)document.title=wanted;
+}
+const versionObserverV426=new MutationObserver(()=>enforceV426Identity());
+document.addEventListener('DOMContentLoaded',()=>{
+  enforceV426Identity();
+  versionObserverV426.observe(document.documentElement,{subtree:true,childList:true,characterData:true});
+});
+const initV426Base=init;
+init=async function(){const r=await initV426Base();enforceV426Identity();return r;};
+setTimeout(enforceV426Identity,0);
+setTimeout(enforceV426Identity,500);
+setTimeout(enforceV426Identity,2000);
+setTimeout(enforceV426Identity,9000);
