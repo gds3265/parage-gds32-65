@@ -157,3 +157,6 @@ body.mode-terrain #nav button{font-size:15px;padding:12px 18px}
 .dermatitisNoteV425{flex:1 1 240px!important;display:grid!important;grid-template-columns:auto 1fr;align-items:center;gap:8px}
 .dermatitisNoteV425 input{min-width:0;width:100%}
 @media(max-width:700px){.dermatitisExtrasV425{display:grid;grid-template-columns:1fr 1fr}.dermatitisNoteV425{grid-column:1/-1;display:block!important}.dermatitisNoteV425 input{margin-top:5px}}
+
+/* V4.0.29 */
+.animalSearchGridV429{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.animalSearchGridV429>div{padding:10px;border:1px solid #ead7e1;border-radius:10px;background:#fff}.animalSearchCardV429{margin-top:12px}.searchCountV429{font-weight:700;margin:12px 0}@media(max-width:700px){.animalSearchGridV429{grid-template-columns:1fr}}

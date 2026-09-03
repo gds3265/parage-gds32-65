@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.28');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.29');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.28').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.29').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -1595,7 +1595,7 @@ function makeProformaPdfV311(job){
     ensureWorkedFeet(a);const probs=[],soins=new Set();
     for(const [k,d] of Object.entries(a.claws||{})){if((d.issues||[]).length)probs.push(`${k}: ${(d.issues||[]).join(', ')}`);for(const x of (d.care||[]))if(x==='Pansement'||x==='Talonnette')soins.add(x);}
     const vals=[a.number||'-',categoryLabels[a.category]||a.category||'-',(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')||'-',probs.join('; ')||'RAS',[...soins].join(', ')||'-'];
-    const wrapped=vals.map((v,i)=>pdfWrap311(v,[8,11,28,24,16][i]));const lines=Math.max(...wrapped.map(v=>v.length),1);const h=Math.max(20,lines*9+5);
+    const wrapped=vals.map((v,i)=>pdfWrap311(v,[8,11,28,24,16][i]));const lines=Math.max(...wrapped.map(v=>v.length),1);const h=Math.max(17,lines*7.6+4);
     if(y-h<95) break;
     rect(ax[0],y-h,ax[5]-ax[0],h);ax.slice(1,-1).forEach(x=>line(x,y-h,x,y));
     wrapped.forEach((ls,i)=>ls.forEach((t,j)=>text(ax[i]+3,y-11-j*9,7,t)));
@@ -2942,7 +2942,7 @@ function makeProformaPdfV411(job){
     const vals=[a.number||'-',categoryLabels[a.category]||a.category||'-',(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')||'-',probs.join('; ')||'RAS',[...soins].join(', ')||'-'];
     const wrapped=vals.map((v,i)=>pdfWrap311(v,[8,11,28,24,16][i]));
     const lines=Math.max(...wrapped.map(v=>v.length),1);
-    return {a,wrapped,h:Math.max(20,lines*9+5)+(a.checkNext?15:0)};
+    return {a,wrapped,h:Math.max(17,lines*7.6+4)+(a.checkNext?15:0)};
   });
 
   /* Répartition : on remplit d'abord au maximum la page 1, puis autant de pages que nécessaire. */
@@ -3507,7 +3507,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.28',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.29',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3610,7 +3610,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.28',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.29',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3834,13 +3834,13 @@ setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(
    - Recharge automatique dès qu'un nouveau service worker prend le contrôle.
    - Aucune donnée métier/localStorage n'est effacée.
    ===================================================================== */
-const APP_VERSION_V419='4.0.28';
+const APP_VERSION_V419='4.0.29';
 let parageReloadingV419=false;
 
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.28',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.29',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -4205,7 +4205,7 @@ function makeProformaPdfV424(job){
     const gift=giftSummaryV424(a);if(gift)soins.add('OFFERT: '+gift.replace(/^Offert : /,''));
     const vals=[a.number||'-',categoryLabels[a.category]||a.category||'-',(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')||'-',probs.join('; ')||'RAS',[...soins].join(', ')||'-'];
     const wrapped=vals.map((v,i)=>pdfWrap311(v,[8,11,28,24,16][i]));const lines=Math.max(...wrapped.map(v=>v.length),1);
-    return {a,wrapped,h:Math.max(20,lines*9+5)+(a.checkNext?15:0)};
+    return {a,wrapped,h:Math.max(17,lines*7.6+4)+(a.checkNext?15:0)};
   });
   const pages=[];let remaining=[...animalRows],first=true;const firstStartY=372,nextStartY=730,bottomReserve=82;
   while(remaining.length||pages.length===0){let y=first?firstStartY:nextStartY,rows=[];while(remaining.length){const r=remaining[0];if(y-r.h<bottomReserve&&rows.length)break;if(y-r.h<bottomReserve&&!rows.length){rows.push(remaining.shift());break;}rows.push(remaining.shift());y-=r.h;}pages.push({first,rows});first=false;}
@@ -4260,7 +4260,7 @@ const APP_VERSION_V425='4.0.25';
 
 function footDetailV425(animal,code){
   if(!animal.footDetailsV425||typeof animal.footDetailsV425!=='object')animal.footDetailsV425={};
-  if(!animal.footDetailsV425[code]||typeof animal.footDetailsV425[code]!=='object')animal.footDetailsV425[code]={wound:false,bandage:false,note:''};
+  if(!animal.footDetailsV425[code]||typeof animal.footDetailsV425[code]!=='object')animal.footDetailsV425[code]={wound:false,bandage:false,limace:false,note:''};
   return animal.footDetailsV425[code];
 }
 function setFootDetailV425(animalId,code,key,value){
@@ -4277,13 +4277,13 @@ footHTML=function(animal,code,label){
   syncLegacyAnimal(animal);ensureWorkedFeet(animal);
   const worked=animal.workedFeet.includes(code),photos=footPhotosV4(animal,code),previous=previousFootInfoV4(animal,code),derm=hasFootDermatitisV415(animal,code),fd=footDetailV425(animal,code);
   const previousIcons=previous?`${previous.photo?'📷 ':''}${previous.bandage?'🩹 ':''}${previous.block?'◼️ ':''}`:'';
-  return `<div class="foot ${worked?'worked':''} ${previous?'previousFoot':''}"><h4>${label}${previous?` <span class="previousFootMark" title="Pied traité le ${fmtDate(previous.date)}">↶ ${fmtDate(previous.date)} ${previousIcons}</span>`:''}</h4><button class="footDone ${worked?'on':''}" onclick="toggleFoot('${animal.id}','${code}')">${worked?'✓ Pied fait':'Marquer le pied fait'}</button><button type="button" class="footDermatitis ${derm?'on':''}" onclick="toggleFootDermatitisV415('${animal.id}','${code}')">${derm?'✓ Dermatite':'Dermatite entre les onglons'}</button>${derm?`<div class="dermatitisExtrasV425"><b>Dermatite :</b><label><input type="checkbox" ${fd.wound?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','wound',this.checked)"> Plaie</label><label><input type="checkbox" ${fd.bandage?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','bandage',this.checked)"> Pansement</label><label class="dermatitisNoteV425">Commentaire<input value="${esc(fd.note||'')}" oninput="setFootDetailV425('${animal.id}','${code}','note',this.value)" placeholder="Observation sur la dermatite / plaie"></label></div>`:''}<div class="claws">${['Int','Ext'].map(side=>{const key=code+'-'+side,d=animal.claws[key]||{},cls=(d.issues?.length||d.care?.length||String(d.note||'').trim())?'problem':'';return `<button class="claw ${cls}" onclick="editClaw('${animal.id}','${key}')"><b>${side==='Int'?'Interne':'Externe'}</b><br><small>${[...(d.issues||[]),...(d.care||[])].slice(0,2).join(', ')||d.note||'Autre problème / soin'}</small></button>`;}).join('')}</div><div class="footPhotoBar"><button type="button" class="photoBtn" onclick="addFootPhotoV4('${animal.id}','${code}')">📷 Photo du pied</button>${photos.length?`<span class="photoCount">${photos.length} photo${photos.length>1?'s':''}</span>`:''}</div><div class="footPhotos">${photos.map(p=>`<div class="footPhoto"><img src="${p.data}" alt="Photo du pied" onclick="openFootPhotoV4('${animal.id}','${code}','${p.id}')"><button type="button" title="Supprimer" onclick="event.stopPropagation();removeFootPhotoV4('${animal.id}','${code}','${p.id}')">×</button></div>`).join('')}</div></div>`;
+  return `<div class="foot ${worked?'worked':''} ${previous?'previousFoot':''}"><h4>${label}${previous?` <span class="previousFootMark" title="Pied traité le ${fmtDate(previous.date)}">↶ ${fmtDate(previous.date)} ${previousIcons}</span>`:''}</h4><button class="footDone ${worked?'on':''}" onclick="toggleFoot('${animal.id}','${code}')">${worked?'✓ Pied fait':'Marquer le pied fait'}</button><button type="button" class="footDermatitis ${derm?'on':''}" onclick="toggleFootDermatitisV415('${animal.id}','${code}')">${derm?'✓ Dermatite':'Dermatite entre les onglons'}</button>${derm?`<div class="dermatitisExtrasV425"><b>Dermatite :</b><label><input type="checkbox" ${fd.wound?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','wound',this.checked)"> Plaie</label><label><input type="checkbox" ${fd.bandage?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','bandage',this.checked)"> Pansement</label><label><input type="checkbox" ${fd.limace?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','limace',this.checked)"> Limace</label><label class="dermatitisNoteV425">Commentaire<input value="${esc(fd.note||'')}" oninput="setFootDetailV425('${animal.id}','${code}','note',this.value)" placeholder="Observation sur la dermatite / plaie"></label></div>`:''}<div class="claws">${['Int','Ext'].map(side=>{const key=code+'-'+side,d=animal.claws[key]||{},cls=(d.issues?.length||d.care?.length||String(d.note||'').trim())?'problem':'';return `<button class="claw ${cls}" onclick="editClaw('${animal.id}','${key}')"><b>${side==='Int'?'Interne':'Externe'}</b><br><small>${[...(d.issues||[]),...(d.care||[])].slice(0,2).join(', ')||d.note||'Autre problème / soin'}</small></button>`;}).join('')}</div><div class="footPhotoBar"><button type="button" class="photoBtn" onclick="addFootPhotoV4('${animal.id}','${code}')">📷 Photo du pied</button>${photos.length?`<span class="photoCount">${photos.length} photo${photos.length>1?'s':''}</span>`:''}</div><div class="footPhotos">${photos.map(p=>`<div class="footPhoto"><img src="${p.data}" alt="Photo du pied" onclick="openFootPhotoV4('${animal.id}','${code}','${p.id}')"><button type="button" title="Supprimer" onclick="event.stopPropagation();removeFootPhotoV4('${animal.id}','${code}','${p.id}')">×</button></div>`).join('')}</div></div>`;
 };
 
 const hasAnimalContentV425Base=hasAnimalContent;
 hasAnimalContent=function(a){
   if(hasAnimalContentV425Base(a))return true;
-  return Object.values(a?.footDetailsV425||{}).some(d=>d&&(d.wound||d.bandage||String(d.note||'').trim()));
+  return Object.values(a?.footDetailsV425||{}).some(d=>d&&(d.wound||d.bandage||d.limace||String(d.note||'').trim()));
 };
 
 /* Pansement posé directement sur une dermatite = acte compté exactement comme les autres. */
@@ -4321,12 +4321,13 @@ function makeProformaPdfV425(job){
     for(const code of Object.keys(a.footIssues||{}))if((a.footIssues[code]||[]).includes('Dermatite'))probs.push(`${fl[code]||code}: Dermatite (entre les onglons)`);
     for(const [code,d] of Object.entries(a.footDetailsV425||{})){
       if(d?.wound)probs.push(`${fl[code]||code}: Plaie (dermatite)`);
+      if(d?.limace)probs.push(`${fl[code]||code}: Limace (dermatite)`);
       if(d?.bandage)soins.add(`Pansement ${fl[code]||code}`);
     }
     const gift=giftSummaryV424(a);if(gift)soins.add('OFFERT: '+gift.replace(/^Offert : /,''));
     const vals=[a.number||'-',categoryLabels[a.category]||a.category||'-',(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')||'-',probs.join('; ')||'RAS',[...soins].join(', ')||'-',notes.join(' ; ')||'-'];
-    const wrapped=vals.map((v,i)=>pdfWrap311(v,[5,7,13,20,14,19][i]));const lines=Math.max(...wrapped.map(v=>v.length),1);
-    return {a,wrapped,h:Math.max(20,lines*9+5)+(a.checkNext?15:0)};
+    const wrapped=vals.map((v,i)=>pdfWrap311(v,[8,10,21,31,22,30][i]));const lines=Math.max(...wrapped.map(v=>v.length),1);
+    return {a,wrapped,h:Math.max(17,lines*7.6+4)+(a.checkNext?15:0)};
   });
   const pages=[];let remaining=[...animalRows],first=true;const firstStartY=372,nextStartY=730,bottomReserve=96;
   while(remaining.length||pages.length===0){let y=first?firstStartY:nextStartY,rows=[];while(remaining.length){const r=remaining[0];if(y-r.h<bottomReserve&&rows.length)break;if(y-r.h<bottomReserve&&!rows.length){rows.push(remaining.shift());break;}rows.push(remaining.shift());y-=r.h;}pages.push({first,rows});first=false;}
@@ -4338,7 +4339,7 @@ function makeProformaPdfV425(job){
       y=top-rowH*(priceRows.length+2);[['TOTAL HT',c.ht],['TVA '+c.vat+' %',c.ttc-c.ht],['TOTAL TTC',c.ttc]].forEach((r,i)=>{rect(365,y-rowH*i,196,rowH);line(445,y-rowH*i,445,y-rowH*i+rowH);text(371,y-rowH*i+7,8,r[0],true);text(451,y-rowH*i+7,8,pdfMoney311(r[1]),true);});y-=rowH*3+16;text(margin,y,11,'Recapitulatif de l intervention',true);y-=16;
     }else{cmds.push('q 150 0 0 43 34 785 cm /Im1 Do Q');text(225,807,11,'PRO FORMA / COMPTE RENDU DE PARAGE - SUITE',true);text(margin,766,8.5,`${job.clientName||''} - Cheptel ${job.cheptel||''} - ${fmtDate(job.date)}`,true);line(margin,754,pageW-margin,754,1);text(margin,744,10,'Recapitulatif de l intervention (suite)',true);y=730;}
     const headerY=y;fillRect(ax[0],headerY-20,ax[6]-ax[0],20,.92);rect(ax[0],headerY-20,ax[6]-ax[0],20);ax.slice(1,-1).forEach(x=>line(x,headerY-20,x,headerY));['N bovin','Categorie','Pieds','Problemes','Soins','Observations'].forEach((h,i)=>text(ax[i]+3,headerY-13,7,h,true));y=headerY-20;
-    for(const r of page.rows){const baseH=r.h-(r.a.checkNext?15:0);rect(ax[0],y-baseH,ax[6]-ax[0],baseH);ax.slice(1,-1).forEach(x=>line(x,y-baseH,x,y));r.wrapped.forEach((ls,i)=>ls.forEach((t,j)=>text(ax[i]+3,y-11-j*9,6.7,t)));y-=baseH;if(r.a.checkNext){fillRect(ax[0],y-15,ax[6]-ax[0],15,.96);rect(ax[0],y-15,ax[6]-ax[0],15);text(ax[0]+5,y-10,7,'BOVIN A CONTROLER A LA PROCHAINE VISITE',true);y-=15;}}
+    for(const r of page.rows){const baseH=r.h-(r.a.checkNext?15:0);rect(ax[0],y-baseH,ax[6]-ax[0],baseH);ax.slice(1,-1).forEach(x=>line(x,y-baseH,x,y));r.wrapped.forEach((ls,i)=>ls.forEach((t,j)=>text(ax[i]+3,y-9.5-j*7.6,6.4,t)));y-=baseH;if(r.a.checkNext){fillRect(ax[0],y-15,ax[6]-ax[0],15,.96);rect(ax[0],y-15,ax[6]-ax[0],15);text(ax[0]+5,y-10,7,'BOVIN A CONTROLER A LA PROCHAINE VISITE',true);y-=15;}}
     if(pageIndex===pages.length-1){const jobNote=String(job.comment||'').trim();if(jobNote){const noteLines=pdfWrap311('Commentaire chantier : '+jobNote,86).slice(0,4);noteLines.forEach((t,i)=>text(margin,88-i*9,7.5,t,i===0));}text(margin,48,8,`Modalite : ${job.paymentTiming||'A reception'}     Mode : ${job.paymentMethod||'A definir'}`,true);text(margin,35,7.2,'Paiement a 20 jours - IBAN FR76 1690 6010 2003 4001 9914 139 - BIC AGRIFRPP869');}
     text(500,20,7,`Page ${pageIndex+1}/${pages.length}`);return cmds.join('\n');
   });
@@ -4390,7 +4391,7 @@ setTimeout(updateV425Identity,0);setTimeout(updateV425Identity,1500);setTimeout(
    - Verrouille le badge et le titre sur la version finale malgré les anciens
      modules de migration qui réappliquent brièvement leur ancien numéro.
    ===================================================================== */
-const APP_VERSION_V426='4.0.28';
+const APP_VERSION_V426='4.0.29';
 function enforceV426Identity(){
   document.querySelectorAll('.versionBadge').forEach(x=>{
     if(x.textContent!=='v'+APP_VERSION_V426)x.textContent='v'+APP_VERSION_V426;
@@ -4495,8 +4496,52 @@ openPdfPreview=function(blob,name,options={}){
 };
 
 function enforceV428Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.28');
-  document.title='Suivi Parage v4.0.28';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.29');
+  document.title='Suivi Parage v4.0.29';
 }
 document.addEventListener('DOMContentLoaded',()=>{enforceV428Identity();setTimeout(()=>renderGeneratedFiles().catch(()=>{}),800);});
 setTimeout(enforceV428Identity,0);setTimeout(enforceV428Identity,1000);setTimeout(enforceV428Identity,5000);
+
+
+/* =========================================================
+   V4.0.29 — pro forma compacte + limace interdigitée + recherche bovin
+   ========================================================= */
+function animalSearchDetailsV429(a){
+  const fl=Object.fromEntries(feet);ensureWorkedFeet(a);const probs=[],care=[],notes=[];
+  for(const [k,d] of Object.entries(a.claws||{})){
+    if((d.issues||[]).length)probs.push(`${k}: ${(d.issues||[]).join(', ')}`);
+    if((d.care||[]).length)care.push(`${k}: ${(d.care||[]).join(', ')}`);
+    if(String(d.note||'').trim())notes.push(`${k}: ${String(d.note).trim()}`);
+  }
+  for(const code of Object.keys(a.footIssues||{}))if((a.footIssues[code]||[]).includes('Dermatite'))probs.push(`${fl[code]||code}: Dermatite entre les onglons`);
+  for(const [code,d] of Object.entries(a.footDetailsV425||{})){
+    if(d?.wound)probs.push(`${fl[code]||code}: Plaie`);
+    if(d?.limace)probs.push(`${fl[code]||code}: Limace`);
+    if(d?.bandage)care.push(`${fl[code]||code}: Pansement`);
+    if(String(d?.note||'').trim())notes.push(`${fl[code]||code}: ${String(d.note).trim()}`);
+  }
+  if(String(a.notes||'').trim())notes.push(String(a.notes).trim());
+  return {feet:(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')||'Non précisés',probs:probs.join(' ; ')||'RAS',care:care.join(' ; ')||'Aucun',notes:notes.join(' ; ')||'—'};
+}
+function renderAnimalSearchV429(){
+  const host=$('animalSearchResultsV429');if(!host)return;
+  const herd=String($('animalSearchHerdV429')?.value||'').trim().toLowerCase();
+  const num=String($('animalSearchNumberV429')?.value||'').trim().toLowerCase();
+  if(!herd&&!num){host.innerHTML='<p class="hint">Saisissez au moins un n° de cheptel ou un n° bovin.</p>';return;}
+  const hits=[];
+  for(const j of jobs||[]){
+    if(j.importedHistory===true && !(j.animals||[]).length)continue;
+    if(herd && !String(j.cheptel||'').toLowerCase().includes(herd))continue;
+    for(const a of(j.animals||[])){
+      if(num && !String(a.number||'').toLowerCase().includes(num))continue;
+      hits.push({j,a});
+    }
+  }
+  hits.sort((x,y)=>String(y.j.date||'').localeCompare(String(x.j.date||'')));
+  if(!hits.length){host.innerHTML='<div class="panel"><b>Aucun passage retrouvé.</b><p class="hint">La reprise d’historique ancienne ne contient pas toujours le détail des numéros bovins.</p></div>';return;}
+  host.innerHTML=`<div class="searchCountV429">${hits.length} passage(s) retrouvé(s)</div>`+hits.map(({j,a})=>{const d=animalSearchDetailsV429(a);return `<div class="panel animalSearchCardV429"><div class="toolbar"><h3>Bovin ${esc(a.number||'-')}</h3><b>${fmtDate(j.date)}</b></div><p><b>${esc(j.clientName||'')}</b> · Cheptel ${esc(j.cheptel||'')}</p><div class="animalSearchGridV429"><div><b>Pieds</b><br>${esc(d.feet)}</div><div><b>Problèmes</b><br>${esc(d.probs)}</div><div><b>Soins</b><br>${esc(d.care)}</div><div><b>Observations</b><br>${esc(d.notes)}</div></div></div>`;}).join('');
+}
+
+function enforceV429Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.29');document.title='Suivi Parage v4.0.29';}
+document.addEventListener('DOMContentLoaded',()=>{enforceV429Identity();});
+setTimeout(enforceV429Identity,0);setTimeout(enforceV429Identity,1000);setTimeout(enforceV429Identity,5000);
