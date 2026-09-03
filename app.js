@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.26');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.27');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.26').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.27').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -3507,7 +3507,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.26',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.27',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3527,18 +3527,12 @@ function proformaFilenameV415(job){
   return `Proforma_${safeFilenameV415(job?.clientName||'Eleveur')}_${safeFilenameV415(job?.cheptel||'sans_cheptel')}_${job?.date||today()}.pdf`;
 }
 
-/* Dermatite : lésion interdigitée, enregistrée au niveau du pied et non d'un onglon. */
+/* Dermatite : peut être enregistrée soit au niveau interdigital du pied,
+   soit précisément sur l'onglon interne/externe selon l'observation terrain. */
 const syncLegacyAnimalV415Base=syncLegacyAnimal;
 syncLegacyAnimal=function(a){
   a=syncLegacyAnimalV415Base(a); if(!a)return a;
   if(!a.footIssues||typeof a.footIssues!=='object')a.footIssues={};
-  for(const [key,d] of Object.entries(a.claws||{})){
-    if(!Array.isArray(d?.issues)||!d.issues.includes('Dermatite'))continue;
-    const code=key.split('-')[0];
-    a.footIssues[code]=Array.from(new Set([...(a.footIssues[code]||[]),'Dermatite']));
-    d.issues=d.issues.filter(x=>x!=='Dermatite');
-    if(!d.issues.length&&!d.care?.length&&!String(d.note||'').trim())delete a.claws[key];
-  }
   return a;
 };
 function hasFootDermatitisV415(animal,code){return !!(animal?.footIssues?.[code]||[]).includes('Dermatite');}
@@ -3562,8 +3556,8 @@ editClaw=function(animalId,key){
   const animal=current.animals.find(x=>x.id===animalId);if(!animal)return;syncLegacyAnimal(animal);
   const d=animal.claws[key]||{touched:true,issues:[],care:[],note:''};
   const overlay=document.createElement('div');overlay.className='detailBox';overlay.style.position='fixed';overlay.style.inset='10% 5%';overlay.style.zIndex=20;overlay.style.overflow='auto';overlay.style.boxShadow='0 0 0 9999px #0008';
-  const clawIssues=issues.filter(x=>x!=='Dermatite');
-  overlay.innerHTML=`<div class="toolbar"><h3>${key}</h3><button id="closeTop">✕</button></div><p class="hint">Pour une dermatite, utilisez directement le bouton « Dermatite entre les onglons » du pied concerné.</p><h4>Problèmes de l'onglon</h4><div class="chips">${clawIssues.map(x=>`<button class="chip ${(d.issues||[]).includes(x)?'on':''}" data-type="issue" data-val="${x}">${x}</button>`).join('')}</div><h4>Soins</h4><div class="chips">${care.map(x=>`<button class="chip ${(d.care||[]).includes(x)?'on':''}" data-type="care" data-val="${x}">${x}</button>`).join('')}</div><label>Commentaire<input id="clawNote" value="${esc(d.note||'')}"></label><div class="actions"><button id="clearDetail">Effacer</button><button class="primary" id="closeDetail">Fermer</button></div>`;
+  const clawIssues=issues;
+  overlay.innerHTML=`<div class="toolbar"><h3>${key}</h3><button id="closeTop">✕</button></div><p class="hint">La dermatite peut être cochée ici lorsqu'elle concerne cet onglon, ou via « Dermatite entre les onglons » lorsqu'elle est interdigitée.</p><h4>Problèmes de l'onglon</h4><div class="chips">${clawIssues.map(x=>`<button class="chip ${(d.issues||[]).includes(x)?'on':''}" data-type="issue" data-val="${x}">${x}</button>`).join('')}</div><h4>Soins</h4><div class="chips">${care.map(x=>`<button class="chip ${(d.care||[]).includes(x)?'on':''}" data-type="care" data-val="${x}">${x}</button>`).join('')}</div><label>Commentaire<input id="clawNote" value="${esc(d.note||'')}"></label><div class="actions"><button id="clearDetail">Effacer</button><button class="primary" id="closeDetail">Fermer</button></div>`;
   document.body.appendChild(overlay);
   const persist=()=>{animal.claws[key]={touched:true,issues:[...overlay.querySelectorAll('[data-type=issue].on')].map(x=>x.dataset.val),care:[...overlay.querySelectorAll('[data-type=care].on')].map(x=>x.dataset.val),note:overlay.querySelector('#clawNote').value};if(animal.claws[key].care.includes('À revoir'))animal.checkNext=true;const footCode=key.split('-')[0];ensureWorkedFeet(animal);if(!animal.workedFeet.includes(footCode))animal.workedFeet.push(footCode);};
   overlay.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{b.classList.toggle('on');persist();});overlay.querySelector('#clawNote').oninput=persist;
@@ -3616,7 +3610,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.26',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.27',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3840,13 +3834,13 @@ setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(
    - Recharge automatique dès qu'un nouveau service worker prend le contrôle.
    - Aucune donnée métier/localStorage n'est effacée.
    ===================================================================== */
-const APP_VERSION_V419='4.0.26';
+const APP_VERSION_V419='4.0.27';
 let parageReloadingV419=false;
 
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.26',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.27',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -4391,12 +4385,12 @@ setTimeout(updateV425Identity,0);setTimeout(updateV425Identity,1500);setTimeout(
 
 
 /* =====================================================================
-   V4.0.26 — correctif boucle PWA / identité de version
+   V4.0.27 — correctif boucle PWA / identité de version
    - La version distante et la version comparée sont désormais identiques.
    - Verrouille le badge et le titre sur la version finale malgré les anciens
      modules de migration qui réappliquent brièvement leur ancien numéro.
    ===================================================================== */
-const APP_VERSION_V426='4.0.26';
+const APP_VERSION_V426='4.0.27';
 function enforceV426Identity(){
   document.querySelectorAll('.versionBadge').forEach(x=>{
     if(x.textContent!=='v'+APP_VERSION_V426)x.textContent='v'+APP_VERSION_V426;
@@ -4415,3 +4409,10 @@ setTimeout(enforceV426Identity,0);
 setTimeout(enforceV426Identity,500);
 setTimeout(enforceV426Identity,2000);
 setTimeout(enforceV426Identity,9000);
+
+
+/* =========================================================
+   V4.0.27 — dermatite disponible aussi par onglon
+   - Dermatite peut être cochée sur onglon interne ou externe.
+   - Le choix interdigital au niveau du pied reste disponible.
+   ========================================================= */
