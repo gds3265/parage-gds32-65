@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.29');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.30');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.29').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.30').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -3507,7 +3507,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.29',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.30',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3610,7 +3610,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.29',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.30',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3834,13 +3834,13 @@ setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(
    - Recharge automatique dès qu'un nouveau service worker prend le contrôle.
    - Aucune donnée métier/localStorage n'est effacée.
    ===================================================================== */
-const APP_VERSION_V419='4.0.29';
+const APP_VERSION_V419='4.0.30';
 let parageReloadingV419=false;
 
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.29',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.30',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -4310,24 +4310,33 @@ function fieldNotesV425(a){
   return notes;
 }
 
+function pdfFootShortV430(code){return ({PAvG:'PAvG',PAvD:'PAvD',PArG:'PArG',PArD:'PArD'})[code]||code;}
+function pdfCompactTerrainTextV430(value){
+  return String(value||'')
+    .replace(/Antérieur gauche/gi,'PAvG').replace(/Antérieur droit/gi,'PAvD')
+    .replace(/Postérieur gauche/gi,'PArG').replace(/Postérieur droit/gi,'PArD')
+    .replace(/Dermatite \(entre les onglons\)/gi,'Dermatite interdigitée');
+}
+
 function makeProformaPdfV425(job){
-  const c=calc(job),fl=Object.fromEntries(feet),pageW=595,margin=34,ax=[34,72,120,210,340,435,561];
+  const c=calc(job),fl=Object.fromEntries(feet),pageW=595,margin=34,ax=[34,72,120,190,335,425,561];
   const animalRows=(job.animals||[]).filter(hasAnimalContent).map(a=>{
     ensureWorkedFeet(a);const probs=[],soins=new Set(),notes=fieldNotesV425(a);
     for(const [k,d] of Object.entries(a.claws||{})){
       if((d.issues||[]).length)probs.push(`${k}: ${(d.issues||[]).join(', ')}`);
       for(const x of(d.care||[]))if(x==='Pansement'||x==='Talonnette')soins.add(x);
     }
-    for(const code of Object.keys(a.footIssues||{}))if((a.footIssues[code]||[]).includes('Dermatite'))probs.push(`${fl[code]||code}: Dermatite (entre les onglons)`);
+    for(const code of Object.keys(a.footIssues||{}))if((a.footIssues[code]||[]).includes('Dermatite'))probs.push(`${pdfFootShortV430(code)}: Dermatite interdigitée`);
     for(const [code,d] of Object.entries(a.footDetailsV425||{})){
-      if(d?.wound)probs.push(`${fl[code]||code}: Plaie (dermatite)`);
-      if(d?.limace)probs.push(`${fl[code]||code}: Limace (dermatite)`);
-      if(d?.bandage)soins.add(`Pansement ${fl[code]||code}`);
+      if(d?.wound)probs.push(`${pdfFootShortV430(code)}: Plaie (dermatite)`);
+      if(d?.limace)probs.push(`${pdfFootShortV430(code)}: Limace (dermatite)`);
+      if(d?.bandage)soins.add(`Pansement ${pdfFootShortV430(code)}`);
     }
     const gift=giftSummaryV424(a);if(gift)soins.add('OFFERT: '+gift.replace(/^Offert : /,''));
-    const vals=[a.number||'-',categoryLabels[a.category]||a.category||'-',(a.workedFeet||[]).map(x=>fl[x]||x).join(', ')||'-',probs.join('; ')||'RAS',[...soins].join(', ')||'-',notes.join(' ; ')||'-'];
-    const wrapped=vals.map((v,i)=>pdfWrap311(v,[8,10,21,31,22,30][i]));const lines=Math.max(...wrapped.map(v=>v.length),1);
-    return {a,wrapped,h:Math.max(17,lines*7.6+4)+(a.checkNext?15:0)};
+    const shortFeet=(a.workedFeet||[]).map(pdfFootShortV430).join(' ')||'-';
+    const vals=[a.number||'-',categoryLabels[a.category]||a.category||'-',shortFeet,pdfCompactTerrainTextV430(probs.join('; ')||'RAS'),pdfCompactTerrainTextV430([...soins].join(', ')||'-'),pdfCompactTerrainTextV430(notes.join(' ; ')||'-')];
+    const wrapped=vals.map((v,i)=>pdfWrap311(v,[8,10,18,35,21,34][i]));const lines=Math.max(...wrapped.map(v=>v.length),1);
+    return {a,wrapped,h:Math.max(15,lines*7+2)+(a.checkNext?14:0)};
   });
   const pages=[];let remaining=[...animalRows],first=true;const firstStartY=372,nextStartY=730,bottomReserve=96;
   while(remaining.length||pages.length===0){let y=first?firstStartY:nextStartY,rows=[];while(remaining.length){const r=remaining[0];if(y-r.h<bottomReserve&&rows.length)break;if(y-r.h<bottomReserve&&!rows.length){rows.push(remaining.shift());break;}rows.push(remaining.shift());y-=r.h;}pages.push({first,rows});first=false;}
@@ -4339,7 +4348,7 @@ function makeProformaPdfV425(job){
       y=top-rowH*(priceRows.length+2);[['TOTAL HT',c.ht],['TVA '+c.vat+' %',c.ttc-c.ht],['TOTAL TTC',c.ttc]].forEach((r,i)=>{rect(365,y-rowH*i,196,rowH);line(445,y-rowH*i,445,y-rowH*i+rowH);text(371,y-rowH*i+7,8,r[0],true);text(451,y-rowH*i+7,8,pdfMoney311(r[1]),true);});y-=rowH*3+16;text(margin,y,11,'Recapitulatif de l intervention',true);y-=16;
     }else{cmds.push('q 150 0 0 43 34 785 cm /Im1 Do Q');text(225,807,11,'PRO FORMA / COMPTE RENDU DE PARAGE - SUITE',true);text(margin,766,8.5,`${job.clientName||''} - Cheptel ${job.cheptel||''} - ${fmtDate(job.date)}`,true);line(margin,754,pageW-margin,754,1);text(margin,744,10,'Recapitulatif de l intervention (suite)',true);y=730;}
     const headerY=y;fillRect(ax[0],headerY-20,ax[6]-ax[0],20,.92);rect(ax[0],headerY-20,ax[6]-ax[0],20);ax.slice(1,-1).forEach(x=>line(x,headerY-20,x,headerY));['N bovin','Categorie','Pieds','Problemes','Soins','Observations'].forEach((h,i)=>text(ax[i]+3,headerY-13,7,h,true));y=headerY-20;
-    for(const r of page.rows){const baseH=r.h-(r.a.checkNext?15:0);rect(ax[0],y-baseH,ax[6]-ax[0],baseH);ax.slice(1,-1).forEach(x=>line(x,y-baseH,x,y));r.wrapped.forEach((ls,i)=>ls.forEach((t,j)=>text(ax[i]+3,y-9.5-j*7.6,6.4,t)));y-=baseH;if(r.a.checkNext){fillRect(ax[0],y-15,ax[6]-ax[0],15,.96);rect(ax[0],y-15,ax[6]-ax[0],15);text(ax[0]+5,y-10,7,'BOVIN A CONTROLER A LA PROCHAINE VISITE',true);y-=15;}}
+    for(const r of page.rows){const baseH=r.h-(r.a.checkNext?15:0);rect(ax[0],y-baseH,ax[6]-ax[0],baseH);ax.slice(1,-1).forEach(x=>line(x,y-baseH,x,y));r.wrapped.forEach((ls,i)=>ls.forEach((t,j)=>text(ax[i]+3,y-8.2-j*7,6.2,t)));y-=baseH;if(r.a.checkNext){fillRect(ax[0],y-14,ax[6]-ax[0],14,.96);rect(ax[0],y-14,ax[6]-ax[0],14);text(ax[0]+5,y-9.5,6.8,'BOVIN A CONTROLER A LA PROCHAINE VISITE',true);y-=14;}}
     if(pageIndex===pages.length-1){const jobNote=String(job.comment||'').trim();if(jobNote){const noteLines=pdfWrap311('Commentaire chantier : '+jobNote,86).slice(0,4);noteLines.forEach((t,i)=>text(margin,88-i*9,7.5,t,i===0));}text(margin,48,8,`Modalite : ${job.paymentTiming||'A reception'}     Mode : ${job.paymentMethod||'A definir'}`,true);text(margin,35,7.2,'Paiement a 20 jours - IBAN FR76 1690 6010 2003 4001 9914 139 - BIC AGRIFRPP869');}
     text(500,20,7,`Page ${pageIndex+1}/${pages.length}`);return cmds.join('\n');
   });
@@ -4391,7 +4400,7 @@ setTimeout(updateV425Identity,0);setTimeout(updateV425Identity,1500);setTimeout(
    - Verrouille le badge et le titre sur la version finale malgré les anciens
      modules de migration qui réappliquent brièvement leur ancien numéro.
    ===================================================================== */
-const APP_VERSION_V426='4.0.29';
+const APP_VERSION_V426='4.0.30';
 function enforceV426Identity(){
   document.querySelectorAll('.versionBadge').forEach(x=>{
     if(x.textContent!=='v'+APP_VERSION_V426)x.textContent='v'+APP_VERSION_V426;
@@ -4496,15 +4505,15 @@ openPdfPreview=function(blob,name,options={}){
 };
 
 function enforceV428Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.29');
-  document.title='Suivi Parage v4.0.29';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.30');
+  document.title='Suivi Parage v4.0.30';
 }
 document.addEventListener('DOMContentLoaded',()=>{enforceV428Identity();setTimeout(()=>renderGeneratedFiles().catch(()=>{}),800);});
 setTimeout(enforceV428Identity,0);setTimeout(enforceV428Identity,1000);setTimeout(enforceV428Identity,5000);
 
 
 /* =========================================================
-   V4.0.29 — pro forma compacte + limace interdigitée + recherche bovin
+   V4.0.30 — pro forma compacte + limace interdigitée + recherche bovin
    ========================================================= */
 function animalSearchDetailsV429(a){
   const fl=Object.fromEntries(feet);ensureWorkedFeet(a);const probs=[],care=[],notes=[];
@@ -4542,6 +4551,6 @@ function renderAnimalSearchV429(){
   host.innerHTML=`<div class="searchCountV429">${hits.length} passage(s) retrouvé(s)</div>`+hits.map(({j,a})=>{const d=animalSearchDetailsV429(a);return `<div class="panel animalSearchCardV429"><div class="toolbar"><h3>Bovin ${esc(a.number||'-')}</h3><b>${fmtDate(j.date)}</b></div><p><b>${esc(j.clientName||'')}</b> · Cheptel ${esc(j.cheptel||'')}</p><div class="animalSearchGridV429"><div><b>Pieds</b><br>${esc(d.feet)}</div><div><b>Problèmes</b><br>${esc(d.probs)}</div><div><b>Soins</b><br>${esc(d.care)}</div><div><b>Observations</b><br>${esc(d.notes)}</div></div></div>`;}).join('');
 }
 
-function enforceV429Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.29');document.title='Suivi Parage v4.0.29';}
+function enforceV429Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.30');document.title='Suivi Parage v4.0.30';}
 document.addEventListener('DOMContentLoaded',()=>{enforceV429Identity();});
 setTimeout(enforceV429Identity,0);setTimeout(enforceV429Identity,1000);setTimeout(enforceV429Identity,5000);
