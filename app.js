@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.27');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.28');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.27').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.28').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -3507,7 +3507,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.27',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.28',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3610,7 +3610,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.27',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.28',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3834,13 +3834,13 @@ setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(
    - Recharge automatique dès qu'un nouveau service worker prend le contrôle.
    - Aucune donnée métier/localStorage n'est effacée.
    ===================================================================== */
-const APP_VERSION_V419='4.0.27';
+const APP_VERSION_V419='4.0.28';
 let parageReloadingV419=false;
 
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.27',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.28',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -4390,7 +4390,7 @@ setTimeout(updateV425Identity,0);setTimeout(updateV425Identity,1500);setTimeout(
    - Verrouille le badge et le titre sur la version finale malgré les anciens
      modules de migration qui réappliquent brièvement leur ancien numéro.
    ===================================================================== */
-const APP_VERSION_V426='4.0.27';
+const APP_VERSION_V426='4.0.28';
 function enforceV426Identity(){
   document.querySelectorAll('.versionBadge').forEach(x=>{
     if(x.textContent!=='v'+APP_VERSION_V426)x.textContent='v'+APP_VERSION_V426;
@@ -4416,3 +4416,87 @@ setTimeout(enforceV426Identity,9000);
    - Dermatite peut être cochée sur onglon interne ou externe.
    - Le choix interdigital au niveau du pied reste disponible.
    ========================================================= */
+
+
+/* =========================================================
+   V4.0.28 — partage Android PDF/ZIP fiable
+   - Conserve les blobs des fichiers générés en mémoire pour que le partage
+     soit déclenché directement par le clic utilisateur (Web Share API).
+   - Ne tente plus d'ouvrir un ZIP dans l'aperçu PDF.
+   - En cas d'échec réel du partage natif, télécharge clairement le fichier
+     au lieu de ne rien faire.
+   ========================================================= */
+let generatedFilesCacheV428=new Map();
+
+async function shareBlobV428(blob,name){
+  const type=blob?.type || (String(name).toLowerCase().endsWith('.pdf')?'application/pdf':String(name).toLowerCase().endsWith('.zip')?'application/zip':'application/octet-stream');
+  const file=new File([blob],name,{type});
+  if(typeof navigator.share==='function'){
+    try{
+      if(!navigator.canShare || navigator.canShare({files:[file]})){
+        await navigator.share({title:name,files:[file]});
+        return true;
+      }
+    }catch(e){
+      if(e && e.name==='AbortError')return false;
+      console.warn('Partage natif impossible',e);
+      download(blob,name);
+      toast('Partage Android indisponible : fichier téléchargé');
+      return false;
+    }
+  }
+  download(blob,name);
+  toast('Partage non disponible : fichier téléchargé');
+  return false;
+}
+shareBlob=shareBlobV428;
+
+renderGeneratedFiles=async function(){
+  const el=$('generatedFilesList');if(!el)return;
+  const rows=await listGeneratedFiles().catch(()=>[]);
+  generatedFilesCacheV428=new Map(rows.map(r=>[r.id,r]));
+  el.innerHTML=rows.length?rows.slice(0,40).map(r=>`<div class="generatedFile"><div class="grow"><b>${esc(r.name)}</b><br><small>${new Date(r.createdAt).toLocaleString('fr-FR')}</small></div><button onclick="openStoredFileV428('${r.id}')">Ouvrir</button><button onclick="shareStoredFileV428('${r.id}')">Partager</button><button onclick="deleteGeneratedFile('${r.id}')">Supprimer</button></div>`).join(''):'<p>Aucun fichier généré.</p>';
+};
+
+function shareStoredFileV428(id){
+  const r=generatedFilesCacheV428.get(id);
+  if(!r){toast('Fichier indisponible, rechargez la liste');return;}
+  return shareBlobV428(r.blob,r.name);
+}
+shareStoredFile=shareStoredFileV428;
+
+function openArchivePreviewV428(blob,name){
+  document.querySelector('.pdfOverlay')?.remove();
+  const overlay=document.createElement('div');overlay.className='pdfOverlay';
+  overlay.innerHTML=`<div class="pdfToolbar"><strong>${esc(name)}</strong><button class="primary" id="archiveShareV428">Partager</button><button id="archiveCloseV428">Retour à l'application</button></div><div class="pdfAndroidPanel"><div class="pdfIcon">ZIP</div><h3>Fichier comptabilité prêt</h3><p>Ce fichier ZIP contient les documents du lot. Vous pouvez le partager directement ou l'enregistrer sur l'appareil.</p><button class="primary" id="archiveShare2V428">Partager le ZIP</button><button id="archiveDownloadV428">Télécharger le ZIP</button></div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#archiveCloseV428').onclick=()=>overlay.remove();
+  overlay.querySelector('#archiveShareV428').onclick=()=>shareBlobV428(blob,name);
+  overlay.querySelector('#archiveShare2V428').onclick=()=>shareBlobV428(blob,name);
+  overlay.querySelector('#archiveDownloadV428').onclick=()=>download(blob,name);
+}
+
+function openStoredFileV428(id){
+  const r=generatedFilesCacheV428.get(id);
+  if(!r){toast('Fichier indisponible, rechargez la liste');return;}
+  const lower=String(r.name||'').toLowerCase();
+  if(lower.endsWith('.pdf') || r.blob?.type==='application/pdf')openPdfPreview(r.blob,r.name);
+  else if(lower.endsWith('.zip') || r.blob?.type==='application/zip')openArchivePreviewV428(r.blob,r.name);
+  else download(r.blob,r.name);
+}
+openStoredFile=openStoredFileV428;
+
+const openPdfPreviewV428Base=openPdfPreview;
+openPdfPreview=function(blob,name,options={}){
+  openPdfPreviewV428Base(blob,name,options);
+  const overlay=document.querySelector('.pdfOverlay');if(!overlay)return;
+  const top=overlay.querySelector('#pdfShare');if(top)top.onclick=()=>shareBlobV428(blob,name);
+  const android=overlay.querySelector('#pdfShareAndroid');if(android)android.onclick=()=>shareBlobV428(blob,name);
+};
+
+function enforceV428Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.28');
+  document.title='Suivi Parage v4.0.28';
+}
+document.addEventListener('DOMContentLoaded',()=>{enforceV428Identity();setTimeout(()=>renderGeneratedFiles().catch(()=>{}),800);});
+setTimeout(enforceV428Identity,0);setTimeout(enforceV428Identity,1000);setTimeout(enforceV428Identity,5000);
