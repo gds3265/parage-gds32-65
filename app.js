@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.30');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.31');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.30').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.31').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -2018,16 +2018,25 @@ function resizePhotoV4(file){
     };reader.readAsDataURL(file);
   });
 }
-async function addFootPhotoV4(animalId,code){
-  const input=document.createElement('input');input.type='file';input.accept='image/*';input.setAttribute('capture','environment');
+async function addFootPhotoV4(animalId,code,source='camera'){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='image/*';
+  if(source==='camera') input.setAttribute('capture','environment');
+  if(source==='gallery') input.multiple=true;
   input.onchange=async()=>{
-    const file=input.files?.[0];if(!file)return;
+    const files=Array.from(input.files||[]);if(!files.length)return;
     try{
-      const data=await resizePhotoV4(file),animal=current.animals.find(a=>a.id===animalId);if(!animal)return;
-      const photos=footPhotosV4(animal,code);photos.push({id:uid(),data,name:file.name||'photo.jpg',createdAt:new Date().toISOString()});
+      const animal=current.animals.find(a=>a.id===animalId);if(!animal)return;
+      const photos=footPhotosV4(animal,code);
+      for(const file of files){
+        const data=await resizePhotoV4(file);
+        photos.push({id:uid(),data,name:file.name||'photo.jpg',createdAt:new Date().toISOString(),source:source==='gallery'?'gallery':'camera'});
+      }
       ensureWorkedFeet(animal);if(!animal.workedFeet.includes(code))animal.workedFeet.push(code);
-      saveDraftSilently();renderAnimals();toast('Photo ajoutée au pied');
+      saveDraftSilently();renderAnimals();toast(files.length>1?`${files.length} photos ajoutées au pied`:'Photo ajoutée au pied');
     }catch(e){toast('Impossible d’ajouter la photo');}
+    input.value='';
   };
   input.click();
 }
@@ -2045,7 +2054,7 @@ function openFootPhotoV4(animalId,code,photoId){
 footHTML=function(animal,code,label){
   ensureWorkedFeet(animal);const worked=animal.workedFeet.includes(code),photos=footPhotosV4(animal,code),previous=previousFootInfoV4(animal,code);
   const previousIcons=previous?`${previous.photo?'📷 ':''}${previous.bandage?'🩹 ':''}${previous.block?'◼️ ':''}`:'';
-  return `<div class="foot ${worked?'worked':''} ${previous?'previousFoot':''}"><h4>${label}${previous?` <span class="previousFootMark" title="Pied traité le ${fmtDate(previous.date)}">↶ ${fmtDate(previous.date)} ${previousIcons}</span>`:''}</h4><button class="footDone ${worked?'on':''}" onclick="toggleFoot('${animal.id}','${code}')">${worked?'✓ Pied fait':'Marquer le pied fait'}</button><div class="claws">${['Int','Ext'].map(side=>{const key=code+'-'+side,d=animal.claws[key]||{},cls=(d.issues?.length||d.care?.length)?'problem':'';return `<button class="claw ${cls}" onclick="editClaw('${animal.id}','${key}')"><b>${side==='Int'?'Interne':'Externe'}</b><br><small>${[...(d.issues||[]),...(d.care||[])].slice(0,2).join(', ')||'Ajouter un problème'}</small></button>`;}).join('')}</div><div class="footPhotoBar"><button type="button" class="photoBtn" onclick="addFootPhotoV4('${animal.id}','${code}')">📷 Photo du pied</button>${photos.length?`<span class="photoCount">${photos.length} photo${photos.length>1?'s':''}</span>`:''}</div><div class="footPhotos">${photos.map(p=>`<div class="footPhoto"><img src="${p.data}" alt="Photo du pied" onclick="openFootPhotoV4('${animal.id}','${code}','${p.id}')"><button type="button" title="Supprimer" onclick="event.stopPropagation();removeFootPhotoV4('${animal.id}','${code}','${p.id}')">×</button></div>`).join('')}</div></div>`;
+  return `<div class="foot ${worked?'worked':''} ${previous?'previousFoot':''}"><h4>${label}${previous?` <span class="previousFootMark" title="Pied traité le ${fmtDate(previous.date)}">↶ ${fmtDate(previous.date)} ${previousIcons}</span>`:''}</h4><button class="footDone ${worked?'on':''}" onclick="toggleFoot('${animal.id}','${code}')">${worked?'✓ Pied fait':'Marquer le pied fait'}</button><div class="claws">${['Int','Ext'].map(side=>{const key=code+'-'+side,d=animal.claws[key]||{},cls=(d.issues?.length||d.care?.length)?'problem':'';return `<button class="claw ${cls}" onclick="editClaw('${animal.id}','${key}')"><b>${side==='Int'?'Interne':'Externe'}</b><br><small>${[...(d.issues||[]),...(d.care||[])].slice(0,2).join(', ')||'Ajouter un problème'}</small></button>`;}).join('')}</div><div class="footPhotoBar"><button type="button" class="photoBtn" onclick="addFootPhotoV4('${animal.id}','${code}','camera')">📷 Prendre une photo</button><button type="button" class="photoBtn galleryPhotoBtn" onclick="addFootPhotoV4('${animal.id}','${code}','gallery')">🖼️ Ajouter depuis la galerie</button>${photos.length?`<span class="photoCount">${photos.length} photo${photos.length>1?'s':''}</span>`:''}</div><div class="footPhotos">${photos.map(p=>`<div class="footPhoto"><img src="${p.data}" alt="Photo du pied" onclick="openFootPhotoV4('${animal.id}','${code}','${p.id}')"><button type="button" title="Supprimer" onclick="event.stopPropagation();removeFootPhotoV4('${animal.id}','${code}','${p.id}')">×</button></div>`).join('')}</div></div>`;
 };
 
 function renderAuditLog(){
@@ -3507,7 +3516,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.30',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.31',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3549,7 +3558,7 @@ footHTML=function(animal,code,label){
   syncLegacyAnimal(animal);ensureWorkedFeet(animal);
   const worked=animal.workedFeet.includes(code),photos=footPhotosV4(animal,code),previous=previousFootInfoV4(animal,code),derm=hasFootDermatitisV415(animal,code);
   const previousIcons=previous?`${previous.photo?'📷 ':''}${previous.bandage?'🩹 ':''}${previous.block?'◼️ ':''}`:'';
-  return `<div class="foot ${worked?'worked':''} ${previous?'previousFoot':''}"><h4>${label}${previous?` <span class="previousFootMark" title="Pied traité le ${fmtDate(previous.date)}">↶ ${fmtDate(previous.date)} ${previousIcons}</span>`:''}</h4><button class="footDone ${worked?'on':''}" onclick="toggleFoot('${animal.id}','${code}')">${worked?'✓ Pied fait':'Marquer le pied fait'}</button><button type="button" class="footDermatitis ${derm?'on':''}" onclick="toggleFootDermatitisV415('${animal.id}','${code}')">${derm?'✓ Dermatite':'Dermatite entre les onglons'}</button><div class="claws">${['Int','Ext'].map(side=>{const key=code+'-'+side,d=animal.claws[key]||{},cls=(d.issues?.length||d.care?.length)?'problem':'';return `<button class="claw ${cls}" onclick="editClaw('${animal.id}','${key}')"><b>${side==='Int'?'Interne':'Externe'}</b><br><small>${[...(d.issues||[]),...(d.care||[])].slice(0,2).join(', ')||'Autre problème / soin'}</small></button>`;}).join('')}</div><div class="footPhotoBar"><button type="button" class="photoBtn" onclick="addFootPhotoV4('${animal.id}','${code}')">📷 Photo du pied</button>${photos.length?`<span class="photoCount">${photos.length} photo${photos.length>1?'s':''}</span>`:''}</div><div class="footPhotos">${photos.map(p=>`<div class="footPhoto"><img src="${p.data}" alt="Photo du pied" onclick="openFootPhotoV4('${animal.id}','${code}','${p.id}')"><button type="button" title="Supprimer" onclick="event.stopPropagation();removeFootPhotoV4('${animal.id}','${code}','${p.id}')">×</button></div>`).join('')}</div></div>`;
+  return `<div class="foot ${worked?'worked':''} ${previous?'previousFoot':''}"><h4>${label}${previous?` <span class="previousFootMark" title="Pied traité le ${fmtDate(previous.date)}">↶ ${fmtDate(previous.date)} ${previousIcons}</span>`:''}</h4><button class="footDone ${worked?'on':''}" onclick="toggleFoot('${animal.id}','${code}')">${worked?'✓ Pied fait':'Marquer le pied fait'}</button><button type="button" class="footDermatitis ${derm?'on':''}" onclick="toggleFootDermatitisV415('${animal.id}','${code}')">${derm?'✓ Dermatite':'Dermatite entre les onglons'}</button><div class="claws">${['Int','Ext'].map(side=>{const key=code+'-'+side,d=animal.claws[key]||{},cls=(d.issues?.length||d.care?.length)?'problem':'';return `<button class="claw ${cls}" onclick="editClaw('${animal.id}','${key}')"><b>${side==='Int'?'Interne':'Externe'}</b><br><small>${[...(d.issues||[]),...(d.care||[])].slice(0,2).join(', ')||'Autre problème / soin'}</small></button>`;}).join('')}</div><div class="footPhotoBar"><button type="button" class="photoBtn" onclick="addFootPhotoV4('${animal.id}','${code}','camera')">📷 Prendre une photo</button><button type="button" class="photoBtn galleryPhotoBtn" onclick="addFootPhotoV4('${animal.id}','${code}','gallery')">🖼️ Ajouter depuis la galerie</button>${photos.length?`<span class="photoCount">${photos.length} photo${photos.length>1?'s':''}</span>`:''}</div><div class="footPhotos">${photos.map(p=>`<div class="footPhoto"><img src="${p.data}" alt="Photo du pied" onclick="openFootPhotoV4('${animal.id}','${code}','${p.id}')"><button type="button" title="Supprimer" onclick="event.stopPropagation();removeFootPhotoV4('${animal.id}','${code}','${p.id}')">×</button></div>`).join('')}</div></div>`;
 };
 
 editClaw=function(animalId,key){
@@ -3610,7 +3619,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.30',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.31',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3834,13 +3843,13 @@ setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(
    - Recharge automatique dès qu'un nouveau service worker prend le contrôle.
    - Aucune donnée métier/localStorage n'est effacée.
    ===================================================================== */
-const APP_VERSION_V419='4.0.30';
+const APP_VERSION_V419='4.0.31';
 let parageReloadingV419=false;
 
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.30',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.31',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -4277,7 +4286,7 @@ footHTML=function(animal,code,label){
   syncLegacyAnimal(animal);ensureWorkedFeet(animal);
   const worked=animal.workedFeet.includes(code),photos=footPhotosV4(animal,code),previous=previousFootInfoV4(animal,code),derm=hasFootDermatitisV415(animal,code),fd=footDetailV425(animal,code);
   const previousIcons=previous?`${previous.photo?'📷 ':''}${previous.bandage?'🩹 ':''}${previous.block?'◼️ ':''}`:'';
-  return `<div class="foot ${worked?'worked':''} ${previous?'previousFoot':''}"><h4>${label}${previous?` <span class="previousFootMark" title="Pied traité le ${fmtDate(previous.date)}">↶ ${fmtDate(previous.date)} ${previousIcons}</span>`:''}</h4><button class="footDone ${worked?'on':''}" onclick="toggleFoot('${animal.id}','${code}')">${worked?'✓ Pied fait':'Marquer le pied fait'}</button><button type="button" class="footDermatitis ${derm?'on':''}" onclick="toggleFootDermatitisV415('${animal.id}','${code}')">${derm?'✓ Dermatite':'Dermatite entre les onglons'}</button>${derm?`<div class="dermatitisExtrasV425"><b>Dermatite :</b><label><input type="checkbox" ${fd.wound?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','wound',this.checked)"> Plaie</label><label><input type="checkbox" ${fd.bandage?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','bandage',this.checked)"> Pansement</label><label><input type="checkbox" ${fd.limace?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','limace',this.checked)"> Limace</label><label class="dermatitisNoteV425">Commentaire<input value="${esc(fd.note||'')}" oninput="setFootDetailV425('${animal.id}','${code}','note',this.value)" placeholder="Observation sur la dermatite / plaie"></label></div>`:''}<div class="claws">${['Int','Ext'].map(side=>{const key=code+'-'+side,d=animal.claws[key]||{},cls=(d.issues?.length||d.care?.length||String(d.note||'').trim())?'problem':'';return `<button class="claw ${cls}" onclick="editClaw('${animal.id}','${key}')"><b>${side==='Int'?'Interne':'Externe'}</b><br><small>${[...(d.issues||[]),...(d.care||[])].slice(0,2).join(', ')||d.note||'Autre problème / soin'}</small></button>`;}).join('')}</div><div class="footPhotoBar"><button type="button" class="photoBtn" onclick="addFootPhotoV4('${animal.id}','${code}')">📷 Photo du pied</button>${photos.length?`<span class="photoCount">${photos.length} photo${photos.length>1?'s':''}</span>`:''}</div><div class="footPhotos">${photos.map(p=>`<div class="footPhoto"><img src="${p.data}" alt="Photo du pied" onclick="openFootPhotoV4('${animal.id}','${code}','${p.id}')"><button type="button" title="Supprimer" onclick="event.stopPropagation();removeFootPhotoV4('${animal.id}','${code}','${p.id}')">×</button></div>`).join('')}</div></div>`;
+  return `<div class="foot ${worked?'worked':''} ${previous?'previousFoot':''}"><h4>${label}${previous?` <span class="previousFootMark" title="Pied traité le ${fmtDate(previous.date)}">↶ ${fmtDate(previous.date)} ${previousIcons}</span>`:''}</h4><button class="footDone ${worked?'on':''}" onclick="toggleFoot('${animal.id}','${code}')">${worked?'✓ Pied fait':'Marquer le pied fait'}</button><button type="button" class="footDermatitis ${derm?'on':''}" onclick="toggleFootDermatitisV415('${animal.id}','${code}')">${derm?'✓ Dermatite':'Dermatite entre les onglons'}</button>${derm?`<div class="dermatitisExtrasV425"><b>Dermatite :</b><label><input type="checkbox" ${fd.wound?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','wound',this.checked)"> Plaie</label><label><input type="checkbox" ${fd.bandage?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','bandage',this.checked)"> Pansement</label><label><input type="checkbox" ${fd.limace?'checked':''} onchange="setFootDetailV425('${animal.id}','${code}','limace',this.checked)"> Limace</label><label class="dermatitisNoteV425">Commentaire<input value="${esc(fd.note||'')}" oninput="setFootDetailV425('${animal.id}','${code}','note',this.value)" placeholder="Observation sur la dermatite / plaie"></label></div>`:''}<div class="claws">${['Int','Ext'].map(side=>{const key=code+'-'+side,d=animal.claws[key]||{},cls=(d.issues?.length||d.care?.length||String(d.note||'').trim())?'problem':'';return `<button class="claw ${cls}" onclick="editClaw('${animal.id}','${key}')"><b>${side==='Int'?'Interne':'Externe'}</b><br><small>${[...(d.issues||[]),...(d.care||[])].slice(0,2).join(', ')||d.note||'Autre problème / soin'}</small></button>`;}).join('')}</div><div class="footPhotoBar"><button type="button" class="photoBtn" onclick="addFootPhotoV4('${animal.id}','${code}','camera')">📷 Prendre une photo</button><button type="button" class="photoBtn galleryPhotoBtn" onclick="addFootPhotoV4('${animal.id}','${code}','gallery')">🖼️ Ajouter depuis la galerie</button>${photos.length?`<span class="photoCount">${photos.length} photo${photos.length>1?'s':''}</span>`:''}</div><div class="footPhotos">${photos.map(p=>`<div class="footPhoto"><img src="${p.data}" alt="Photo du pied" onclick="openFootPhotoV4('${animal.id}','${code}','${p.id}')"><button type="button" title="Supprimer" onclick="event.stopPropagation();removeFootPhotoV4('${animal.id}','${code}','${p.id}')">×</button></div>`).join('')}</div></div>`;
 };
 
 const hasAnimalContentV425Base=hasAnimalContent;
@@ -4400,7 +4409,7 @@ setTimeout(updateV425Identity,0);setTimeout(updateV425Identity,1500);setTimeout(
    - Verrouille le badge et le titre sur la version finale malgré les anciens
      modules de migration qui réappliquent brièvement leur ancien numéro.
    ===================================================================== */
-const APP_VERSION_V426='4.0.30';
+const APP_VERSION_V426='4.0.31';
 function enforceV426Identity(){
   document.querySelectorAll('.versionBadge').forEach(x=>{
     if(x.textContent!=='v'+APP_VERSION_V426)x.textContent='v'+APP_VERSION_V426;
@@ -4505,15 +4514,15 @@ openPdfPreview=function(blob,name,options={}){
 };
 
 function enforceV428Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.30');
-  document.title='Suivi Parage v4.0.30';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.31');
+  document.title='Suivi Parage v4.0.31';
 }
 document.addEventListener('DOMContentLoaded',()=>{enforceV428Identity();setTimeout(()=>renderGeneratedFiles().catch(()=>{}),800);});
 setTimeout(enforceV428Identity,0);setTimeout(enforceV428Identity,1000);setTimeout(enforceV428Identity,5000);
 
 
 /* =========================================================
-   V4.0.30 — pro forma compacte + limace interdigitée + recherche bovin
+   V4.0.31 — pro forma compacte + limace interdigitée + recherche bovin
    ========================================================= */
 function animalSearchDetailsV429(a){
   const fl=Object.fromEntries(feet);ensureWorkedFeet(a);const probs=[],care=[],notes=[];
@@ -4551,6 +4560,6 @@ function renderAnimalSearchV429(){
   host.innerHTML=`<div class="searchCountV429">${hits.length} passage(s) retrouvé(s)</div>`+hits.map(({j,a})=>{const d=animalSearchDetailsV429(a);return `<div class="panel animalSearchCardV429"><div class="toolbar"><h3>Bovin ${esc(a.number||'-')}</h3><b>${fmtDate(j.date)}</b></div><p><b>${esc(j.clientName||'')}</b> · Cheptel ${esc(j.cheptel||'')}</p><div class="animalSearchGridV429"><div><b>Pieds</b><br>${esc(d.feet)}</div><div><b>Problèmes</b><br>${esc(d.probs)}</div><div><b>Soins</b><br>${esc(d.care)}</div><div><b>Observations</b><br>${esc(d.notes)}</div></div></div>`;}).join('');
 }
 
-function enforceV429Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.30');document.title='Suivi Parage v4.0.30';}
+function enforceV429Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.31');document.title='Suivi Parage v4.0.31';}
 document.addEventListener('DOMContentLoaded',()=>{enforceV429Identity();});
 setTimeout(enforceV429Identity,0);setTimeout(enforceV429Identity,1000);setTimeout(enforceV429Identity,5000);
