@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.31');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.32');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.31').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.32').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -3516,7 +3516,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.31',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.32',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3619,7 +3619,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.31',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.32',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3843,13 +3843,13 @@ setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(
    - Recharge automatique dès qu'un nouveau service worker prend le contrôle.
    - Aucune donnée métier/localStorage n'est effacée.
    ===================================================================== */
-const APP_VERSION_V419='4.0.31';
+const APP_VERSION_V419='4.0.32';
 let parageReloadingV419=false;
 
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.31',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.32',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -4409,7 +4409,7 @@ setTimeout(updateV425Identity,0);setTimeout(updateV425Identity,1500);setTimeout(
    - Verrouille le badge et le titre sur la version finale malgré les anciens
      modules de migration qui réappliquent brièvement leur ancien numéro.
    ===================================================================== */
-const APP_VERSION_V426='4.0.31';
+const APP_VERSION_V426='4.0.32';
 function enforceV426Identity(){
   document.querySelectorAll('.versionBadge').forEach(x=>{
     if(x.textContent!=='v'+APP_VERSION_V426)x.textContent='v'+APP_VERSION_V426;
@@ -4514,15 +4514,15 @@ openPdfPreview=function(blob,name,options={}){
 };
 
 function enforceV428Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.31');
-  document.title='Suivi Parage v4.0.31';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.32');
+  document.title='Suivi Parage v4.0.32';
 }
 document.addEventListener('DOMContentLoaded',()=>{enforceV428Identity();setTimeout(()=>renderGeneratedFiles().catch(()=>{}),800);});
 setTimeout(enforceV428Identity,0);setTimeout(enforceV428Identity,1000);setTimeout(enforceV428Identity,5000);
 
 
 /* =========================================================
-   V4.0.31 — pro forma compacte + limace interdigitée + recherche bovin
+   V4.0.32 — pro forma compacte + limace interdigitée + recherche bovin
    ========================================================= */
 function animalSearchDetailsV429(a){
   const fl=Object.fromEntries(feet);ensureWorkedFeet(a);const probs=[],care=[],notes=[];
@@ -4543,23 +4543,42 @@ function animalSearchDetailsV429(a){
 }
 function renderAnimalSearchV429(){
   const host=$('animalSearchResultsV429');if(!host)return;
-  const herd=String($('animalSearchHerdV429')?.value||'').trim().toLowerCase();
-  const num=String($('animalSearchNumberV429')?.value||'').trim().toLowerCase();
-  if(!herd&&!num){host.innerHTML='<p class="hint">Saisissez au moins un n° de cheptel ou un n° bovin.</p>';return;}
+  const norm=v=>normalizeSearchV415(String(v||''));
+  const farmer=norm($('animalSearchFarmerV432')?.value);
+  const town=norm($('animalSearchTownV432')?.value);
+  const herd=norm($('animalSearchHerdV429')?.value);
+  const num=norm($('animalSearchNumberV429')?.value);
+  if(!farmer&&!town&&!herd&&!num){host.innerHTML='<p class="hint">Saisissez au moins un nom d’éleveur, une commune, un n° de cheptel ou un n° bovin.</p>';return;}
   const hits=[];
   for(const j of jobs||[]){
     if(j.importedHistory===true && !(j.animals||[]).length)continue;
-    if(herd && !String(j.cheptel||'').toLowerCase().includes(herd))continue;
+    const client=(clients||[]).find(c=>String(c.cheptel||'')===String(j.cheptel||''))||{};
+    const ov=(typeof addressOverrides==='object'&&addressOverrides)?(addressOverrides[j.cheptel]||{}):{};
+    const jobFarmer=norm(`${j.clientName||''} ${client.nom||''} ${ov.nom||''}`);
+    const jobTown=norm(`${j.cpVille||''} ${j.address||''} ${client.commune||''} ${client.cpVille||''} ${ov.cpVille||''} ${ov.adresse||''}`);
+    const jobHerd=norm(j.cheptel||client.cheptel||'');
+    if(farmer && !jobFarmer.includes(farmer))continue;
+    if(town && !jobTown.includes(town))continue;
+    if(herd && !jobHerd.includes(herd))continue;
     for(const a of(j.animals||[])){
-      if(num && !String(a.number||'').toLowerCase().includes(num))continue;
+      if(num && !norm(a.number||'').includes(num))continue;
       hits.push({j,a});
     }
   }
   hits.sort((x,y)=>String(y.j.date||'').localeCompare(String(x.j.date||'')));
-  if(!hits.length){host.innerHTML='<div class="panel"><b>Aucun passage retrouvé.</b><p class="hint">La reprise d’historique ancienne ne contient pas toujours le détail des numéros bovins.</p></div>';return;}
-  host.innerHTML=`<div class="searchCountV429">${hits.length} passage(s) retrouvé(s)</div>`+hits.map(({j,a})=>{const d=animalSearchDetailsV429(a);return `<div class="panel animalSearchCardV429"><div class="toolbar"><h3>Bovin ${esc(a.number||'-')}</h3><b>${fmtDate(j.date)}</b></div><p><b>${esc(j.clientName||'')}</b> · Cheptel ${esc(j.cheptel||'')}</p><div class="animalSearchGridV429"><div><b>Pieds</b><br>${esc(d.feet)}</div><div><b>Problèmes</b><br>${esc(d.probs)}</div><div><b>Soins</b><br>${esc(d.care)}</div><div><b>Observations</b><br>${esc(d.notes)}</div></div></div>`;}).join('');
+  if(!hits.length){host.innerHTML='<div class="panel"><b>Aucun passage retrouvé.</b><p class="hint">Vérifiez les critères. La reprise d’historique ancienne ne contient pas toujours le détail des numéros bovins.</p></div>';return;}
+  const farms=new Set(hits.map(x=>`${x.j.cheptel||''}|${x.j.clientName||''}`));
+  host.innerHTML=`<div class="searchCountV429">${hits.length} passage(s) retrouvé(s) · ${farms.size} élevage(s)</div>`+hits.map(({j,a})=>{const d=animalSearchDetailsV429(a);return `<div class="panel animalSearchCardV429"><div class="toolbar"><h3>Bovin ${esc(a.number||'-')}</h3><b>${fmtDate(j.date)}</b></div><p><b>${esc(j.clientName||'')}</b> · Cheptel ${esc(j.cheptel||'')}${j.cpVille?` · ${esc(j.cpVille)}`:''}</p><div class="animalSearchGridV429"><div><b>Pieds</b><br>${esc(d.feet)}</div><div><b>Problèmes</b><br>${esc(d.probs)}</div><div><b>Soins</b><br>${esc(d.care)}</div><div><b>Observations</b><br>${esc(d.notes)}</div></div></div>`;}).join('');
 }
 
-function enforceV429Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.31');document.title='Suivi Parage v4.0.31';}
+function enforceV429Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.32');document.title='Suivi Parage v4.0.32';}
 document.addEventListener('DOMContentLoaded',()=>{enforceV429Identity();});
 setTimeout(enforceV429Identity,0);setTimeout(enforceV429Identity,1000);setTimeout(enforceV429Identity,5000);
+
+
+/* =========================================================
+   V4.0.32 — recherche par nom d’éleveur et commune
+   ========================================================= */
+function enforceV432Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.32');document.title='Suivi Parage v4.0.32';}
+document.addEventListener('DOMContentLoaded',()=>{enforceV432Identity();});
+setTimeout(enforceV432Identity,0);setTimeout(enforceV432Identity,1000);setTimeout(enforceV432Identity,5000);

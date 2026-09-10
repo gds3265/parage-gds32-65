@@ -1,9 +1,9 @@
-const VERSION='4.0.31';
-const CACHE=`suivi-parage-v4-0-31`;
+const VERSION='4.0.32';
+const CACHE=`suivi-parage-v4-0-32`;
 const CORE=[
-  './index.html','./index.html?v=4.0.31','./style.css?v=4.0.31','./app.js?v=4.0.31',
-  './manifest.json?v=4.0.31','./version.json','./app-logo.png?v=4.0.31',
-  './icon-192.png?v=4.0.31','./icon-512.png?v=4.0.31','./apple-touch-icon.png?v=4.0.31','./favicon.png?v=4.0.31'
+  './index.html','./index.html?v=4.0.32','./style.css?v=4.0.32','./app.js?v=4.0.32',
+  './manifest.json?v=4.0.32','./version.json','./app-logo.png?v=4.0.32',
+  './icon-192.png?v=4.0.32','./icon-512.png?v=4.0.32','./apple-touch-icon.png?v=4.0.32','./favicon.png?v=4.0.32'
 ];
 
 self.addEventListener('install',event=>{
@@ -36,7 +36,7 @@ self.addEventListener('fetch',event=>{
         if(fresh&&fresh.ok){const cache=await caches.open(CACHE);cache.put(event.request,fresh.clone());}
         return fresh;
       }catch(e){
-        return (await caches.match(event.request)) || (await caches.match('./index.html')) || (await caches.match('./index.html?v=4.0.31')) || Response.error();
+        return (await caches.match(event.request)) || (await caches.match('./index.html')) || (await caches.match('./index.html?v=4.0.32')) || Response.error();
       }
     })());
     return;
