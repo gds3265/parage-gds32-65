@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.32');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.33');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.32').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.33').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -3516,7 +3516,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.32',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.33',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3619,7 +3619,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.32',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.33',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3843,13 +3843,13 @@ setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(
    - Recharge automatique dès qu'un nouveau service worker prend le contrôle.
    - Aucune donnée métier/localStorage n'est effacée.
    ===================================================================== */
-const APP_VERSION_V419='4.0.32';
+const APP_VERSION_V419='4.0.33';
 let parageReloadingV419=false;
 
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.32',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.33',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -4409,7 +4409,7 @@ setTimeout(updateV425Identity,0);setTimeout(updateV425Identity,1500);setTimeout(
    - Verrouille le badge et le titre sur la version finale malgré les anciens
      modules de migration qui réappliquent brièvement leur ancien numéro.
    ===================================================================== */
-const APP_VERSION_V426='4.0.32';
+const APP_VERSION_V426='4.0.33';
 function enforceV426Identity(){
   document.querySelectorAll('.versionBadge').forEach(x=>{
     if(x.textContent!=='v'+APP_VERSION_V426)x.textContent='v'+APP_VERSION_V426;
@@ -4514,15 +4514,15 @@ openPdfPreview=function(blob,name,options={}){
 };
 
 function enforceV428Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.32');
-  document.title='Suivi Parage v4.0.32';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.33');
+  document.title='Suivi Parage v4.0.33';
 }
 document.addEventListener('DOMContentLoaded',()=>{enforceV428Identity();setTimeout(()=>renderGeneratedFiles().catch(()=>{}),800);});
 setTimeout(enforceV428Identity,0);setTimeout(enforceV428Identity,1000);setTimeout(enforceV428Identity,5000);
 
 
 /* =========================================================
-   V4.0.32 — pro forma compacte + limace interdigitée + recherche bovin
+   V4.0.33 — pro forma compacte + limace interdigitée + recherche bovin
    ========================================================= */
 function animalSearchDetailsV429(a){
   const fl=Object.fromEntries(feet);ensureWorkedFeet(a);const probs=[],care=[],notes=[];
@@ -4571,14 +4571,102 @@ function renderAnimalSearchV429(){
   host.innerHTML=`<div class="searchCountV429">${hits.length} passage(s) retrouvé(s) · ${farms.size} élevage(s)</div>`+hits.map(({j,a})=>{const d=animalSearchDetailsV429(a);return `<div class="panel animalSearchCardV429"><div class="toolbar"><h3>Bovin ${esc(a.number||'-')}</h3><b>${fmtDate(j.date)}</b></div><p><b>${esc(j.clientName||'')}</b> · Cheptel ${esc(j.cheptel||'')}${j.cpVille?` · ${esc(j.cpVille)}`:''}</p><div class="animalSearchGridV429"><div><b>Pieds</b><br>${esc(d.feet)}</div><div><b>Problèmes</b><br>${esc(d.probs)}</div><div><b>Soins</b><br>${esc(d.care)}</div><div><b>Observations</b><br>${esc(d.notes)}</div></div></div>`;}).join('');
 }
 
-function enforceV429Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.32');document.title='Suivi Parage v4.0.32';}
+function enforceV429Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.33');document.title='Suivi Parage v4.0.33';}
 document.addEventListener('DOMContentLoaded',()=>{enforceV429Identity();});
 setTimeout(enforceV429Identity,0);setTimeout(enforceV429Identity,1000);setTimeout(enforceV429Identity,5000);
 
 
 /* =========================================================
-   V4.0.32 — recherche par nom d’éleveur et commune
+   V4.0.33 — recherche par nom d’éleveur et commune
    ========================================================= */
-function enforceV432Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.32');document.title='Suivi Parage v4.0.32';}
+function enforceV432Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.33');document.title='Suivi Parage v4.0.33';}
 document.addEventListener('DOMContentLoaded',()=>{enforceV432Identity();});
 setTimeout(enforceV432Identity,0);setTimeout(enforceV432Identity,1000);setTimeout(enforceV432Identity,5000);
+
+
+/* =========================================================
+   V4.0.33 — diagnostic détaillé de synchronisation Supabase
+   ========================================================= */
+const APP_VERSION_V433='4.0.33';
+let lastSyncDiagnosticV433='';
+
+function syncErrorDetailV433(status, raw, stage){
+  let msg='';
+  try{
+    const j=typeof raw==='string'?JSON.parse(raw):raw;
+    msg=[j?.message,j?.details,j?.hint,j?.code].filter(Boolean).join(' · ');
+  }catch(_){ msg=String(raw||'').trim(); }
+  if(!msg) msg=status?`Réponse HTTP ${status}`:'Erreur réseau ou navigateur';
+  // Évite un bandeau gigantesque, mais conserve le détail complet au clic.
+  return {short:`${stage}${status?` ${status}`:''} — ${msg}`.slice(0,105), full:`Étape : ${stage}\n${status?`HTTP : ${status}\n`:''}${msg}`};
+}
+function setSyncDiagnosticV433(info){
+  const b=$('syncBadge');
+  if(!b)return;
+  if(!info){
+    lastSyncDiagnosticV433='';
+    b.title='';
+    b.onclick=null;
+    localStorage.removeItem('parage.lastSyncError');
+    return;
+  }
+  lastSyncDiagnosticV433=info.full||info.short||String(info);
+  localStorage.setItem('parage.lastSyncError',lastSyncDiagnosticV433);
+  b.textContent='Erreur sync · '+(info.short||'voir détail');
+  b.className='syncBadge pending';
+  b.title=lastSyncDiagnosticV433+'\n\nCliquez pour afficher le détail.';
+  b.onclick=()=>alert('Diagnostic de synchronisation\n\n'+lastSyncDiagnosticV433);
+}
+
+sharedCloudBackup=async function(showToast=true){
+  if(cloudBusy||!authSession||!navigator.onLine||role()==='technicien')return false;
+  const c=cloudConfig();
+  if(!c.key){
+    const info=syncErrorDetailV433(0,'Clé publique Supabase absente sur cet appareil','configuration');
+    setSyncDiagnosticV433(info);if(showToast)toast(info.short);return false;
+  }
+  cloudBusy=true;updateSyncBadge('Synchronisation sécurisée…');
+  let stage='lecture cloud';
+  try{
+    let remote={};
+    const g=await fetch(`${c.url}/rest/v1/parage_backups?id=eq.suivi-parage-main&select=payload,updated_at`,{headers:authHeaders(),cache:'no-store'});
+    if(g.status===401&&await refreshAuthSession()){cloudBusy=false;return sharedCloudBackup(showToast);}
+    if(!g.ok){
+      const raw=await g.text();
+      const info=syncErrorDetailV433(g.status,raw,stage);setSyncDiagnosticV433(info);
+      if(showToast)toast(info.short);return false;
+    }
+    const a=await g.json();remote=a[0]?.payload||{};
+    deletedJobsV413=mergeDeletedV414(deletedJobsV413,remote.deletedJobsV413||{});
+    jobs=mergeJobsV414(jobs,remote.jobs||[]);clearObsoleteTombstonesV414(jobs);persistDeletedJobsV413();
+    if(Array.isArray(remote.tariffHistory)){tariffHistory=mergeByIdV413(tariffHistory,remote.tariffHistory);localStorage.setItem('parage.tariffHistory',JSON.stringify(tariffHistory));}
+    originalSaveAllV3();
+    const payload=Object.assign({},sharedPayloadV413Base(),{jobs,deletedJobsV413,tariffHistory,version:APP_VERSION_V414,updatedBy:currentProfile?.email||''});
+    stage='écriture cloud';
+    const r=await fetch(`${c.url}/rest/v1/parage_backups?on_conflict=id`,{method:'POST',headers:authHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({id:'suivi-parage-main',payload,updated_at:new Date().toISOString()})});
+    if(r.status===401&&await refreshAuthSession()){cloudBusy=false;return sharedCloudBackup(showToast);}
+    if(!r.ok){
+      const raw=await r.text();
+      const info=syncErrorDetailV433(r.status,raw,stage);setSyncDiagnosticV433(info);
+      localStorage.setItem('parage.pendingSync','1');if(showToast)toast(info.short);return false;
+    }
+    localStorage.removeItem('parage.pendingSync');setSyncDiagnosticV433(null);updateSyncBadge();renderHome();renderHistory();renderAccounting();
+    if(showToast)toast('Cloud sécurisé et à jour');return true;
+  }catch(e){
+    localStorage.setItem('parage.pendingSync','1');
+    const info=syncErrorDetailV433(0,e?.message||String(e),stage);setSyncDiagnosticV433(info);
+    if(showToast)toast(info.short);return false;
+  }finally{cloudBusy=false;}
+};
+cloudBackup=sharedCloudBackup;
+
+function enforceV433Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v'+APP_VERSION_V433);
+  document.title='Suivi Parage v'+APP_VERSION_V433;
+  const old=localStorage.getItem('parage.lastSyncError');
+  if(old&&localStorage.getItem('parage.pendingSync')==='1'){
+    const b=$('syncBadge');if(b){b.title=old+'\n\nCliquez pour afficher le détail.';b.onclick=()=>alert('Diagnostic de synchronisation\n\n'+old);}
+  }
+}
+document.addEventListener('DOMContentLoaded',()=>enforceV433Identity());
+setTimeout(enforceV433Identity,0);setTimeout(enforceV433Identity,1000);setTimeout(enforceV433Identity,5000);
