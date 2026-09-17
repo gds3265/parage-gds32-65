@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.33');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.34');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.33').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.34').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -3451,7 +3451,7 @@ restoreData=function(e){
       jobs=restored;
       settings=Object.assign(settings,x.settings||{});costs=x.costs||{};
       if(Array.isArray(x.tariffHistory)){tariffHistory=x.tariffHistory;localStorage.setItem('parage.tariffHistory',JSON.stringify(tariffHistory));}
-      originalSaveAllV3();
+      persistJobsV434();
       localStorage.setItem('parage.settings',JSON.stringify(settings));
       localStorage.setItem('parage.costs',JSON.stringify(costs));
       localStorage.setItem('parage.pendingSync','1');
@@ -3480,7 +3480,7 @@ sharedCloudRestore=async function(silent=false){
     if(Array.isArray(p.tariffHistory)){tariffHistory=mergeByIdV413(tariffHistory,p.tariffHistory);localStorage.setItem('parage.tariffHistory',JSON.stringify(tariffHistory));}
     const localCloud={supabaseUrl:settings.supabaseUrl,supabaseKey:settings.supabaseKey,accountingEmail:settings.accountingEmail};
     settings=Object.assign(settings,p.settings||{},localCloud);
-    originalSaveAllV3();localStorage.setItem('parage.costs',JSON.stringify(costs));localStorage.setItem('parage.addressOverrides',JSON.stringify(addressOverrides));localStorage.setItem('parage.importedClients',JSON.stringify(importedClients));localStorage.setItem('parage.settings',JSON.stringify(settings));
+    await persistJobsV434();localStorage.setItem('parage.costs',JSON.stringify(costs));localStorage.setItem('parage.addressOverrides',JSON.stringify(addressOverrides));localStorage.setItem('parage.importedClients',JSON.stringify(importedClients));localStorage.setItem('parage.settings',JSON.stringify(settings));
     loadSettings();renderHome();renderHistory();renderAccounting();if(!silent)toast('Données fusionnées sans écrasement');return true;
   }catch(e){if(!silent)toast('Lecture cloud impossible — données locales conservées');return false;}
 };
@@ -3498,7 +3498,7 @@ sharedCloudBackup=async function(showToast=true){
     deletedJobsV413=mergeDeletedV414(deletedJobsV413,remote.deletedJobsV413||{});
     jobs=mergeJobsV414(jobs,remote.jobs||[]);clearObsoleteTombstonesV414(jobs);persistDeletedJobsV413();
     if(Array.isArray(remote.tariffHistory)){tariffHistory=mergeByIdV413(tariffHistory,remote.tariffHistory);localStorage.setItem('parage.tariffHistory',JSON.stringify(tariffHistory));}
-    originalSaveAllV3();
+    await persistJobsV434();
     const payload=Object.assign({},sharedPayloadV413Base(),{jobs,deletedJobsV413,tariffHistory,version:APP_VERSION_V414,updatedBy:currentProfile?.email||''});
     const r=await fetch(`${c.url}/rest/v1/parage_backups?on_conflict=id`,{method:'POST',headers:authHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({id:'suivi-parage-main',payload,updated_at:new Date().toISOString()})});
     if(r.status===401&&await refreshAuthSession()){cloudBusy=false;return sharedCloudBackup(showToast);}
@@ -3516,7 +3516,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.33',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.34',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3619,7 +3619,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.33',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.34',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3849,7 +3849,7 @@ let parageReloadingV419=false;
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.33',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.34',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -4640,7 +4640,7 @@ sharedCloudBackup=async function(showToast=true){
     deletedJobsV413=mergeDeletedV414(deletedJobsV413,remote.deletedJobsV413||{});
     jobs=mergeJobsV414(jobs,remote.jobs||[]);clearObsoleteTombstonesV414(jobs);persistDeletedJobsV413();
     if(Array.isArray(remote.tariffHistory)){tariffHistory=mergeByIdV413(tariffHistory,remote.tariffHistory);localStorage.setItem('parage.tariffHistory',JSON.stringify(tariffHistory));}
-    originalSaveAllV3();
+    await persistJobsV434();
     const payload=Object.assign({},sharedPayloadV413Base(),{jobs,deletedJobsV413,tariffHistory,version:APP_VERSION_V414,updatedBy:currentProfile?.email||''});
     stage='écriture cloud';
     const r=await fetch(`${c.url}/rest/v1/parage_backups?on_conflict=id`,{method:'POST',headers:authHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify({id:'suivi-parage-main',payload,updated_at:new Date().toISOString()})});
@@ -4670,3 +4670,97 @@ function enforceV433Identity(){
 }
 document.addEventListener('DOMContentLoaded',()=>enforceV433Identity());
 setTimeout(enforceV433Identity,0);setTimeout(enforceV433Identity,1000);setTimeout(enforceV433Identity,5000);
+
+
+/* =========================================================
+   V4.0.34 — stockage volumineux fiable + sélection comptabilité
+   ========================================================= */
+const APP_VERSION_V434='4.0.34';
+const PARAGE_DB_V434='suivi-parage-storage';
+const PARAGE_STORE_V434='state';
+
+function openParageDbV434(){
+  return new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window))return reject(new Error('IndexedDB indisponible'));
+    const req=indexedDB.open(PARAGE_DB_V434,1);
+    req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(PARAGE_STORE_V434))db.createObjectStore(PARAGE_STORE_V434);};
+    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('Ouverture IndexedDB impossible'));
+  });
+}
+async function idbPutV434(key,value){
+  const db=await openParageDbV434();
+  return new Promise((resolve,reject)=>{const tx=db.transaction(PARAGE_STORE_V434,'readwrite');tx.objectStore(PARAGE_STORE_V434).put(value,key);tx.oncomplete=()=>{db.close();resolve(true)};tx.onerror=()=>{db.close();reject(tx.error||new Error('Écriture IndexedDB impossible'))};});
+}
+async function idbGetV434(key){
+  const db=await openParageDbV434();
+  return new Promise((resolve,reject)=>{const tx=db.transaction(PARAGE_STORE_V434,'readonly');const req=tx.objectStore(PARAGE_STORE_V434).get(key);req.onsuccess=()=>{const v=req.result;db.close();resolve(v)};req.onerror=()=>{db.close();reject(req.error||new Error('Lecture IndexedDB impossible'))};});
+}
+function compactJobsV434(list){
+  /* Le localStorage ne sert plus que de démarrage rapide. Les photos, très lourdes,
+     restent dans IndexedDB et dans le cloud. */
+  return (list||[]).map(j=>{
+    const c=JSON.parse(JSON.stringify(j));
+    for(const a of (c.animals||[])){
+      if(a.footPhotos&&typeof a.footPhotos==='object'){
+        for(const k of Object.keys(a.footPhotos)){
+          const arr=Array.isArray(a.footPhotos[k])?a.footPhotos[k]:[];
+          a.footPhotos[k]=arr.map(p=>({id:p.id,name:p.name||'photo.jpg',createdAt:p.createdAt||'',source:p.source||'',storedInIndexedDb:true}));
+        }
+      }
+    }
+    return c;
+  });
+}
+async function persistJobsV434(){
+  const snapshot=JSON.parse(JSON.stringify(jobs||[]));
+  try{await idbPutV434('jobs',snapshot);}catch(e){console.warn('IndexedDB jobs',e);}
+  const compact=compactJobsV434(snapshot);
+  try{
+    localStorage.setItem('parage.jobs',JSON.stringify(compact));
+  }catch(e){
+    /* Dernier recours : conserver un petit index récent. Les données complètes restent
+       dans IndexedDB et Supabase. */
+    try{localStorage.setItem('parage.jobs',JSON.stringify(compact.slice(0,120)));}catch(_){try{localStorage.removeItem('parage.jobs')}catch(__){}}
+  }
+  return true;
+}
+async function hydrateJobsV434(){
+  try{
+    const full=await idbGetV434('jobs');
+    if(Array.isArray(full)&&full.length){
+      jobs=full;
+      renderHome();renderHistory();renderAccounting();
+    }else{
+      /* Première ouverture de la 4.0.34 : migre immédiatement le contenu existant. */
+      await persistJobsV434();
+    }
+  }catch(e){
+    /* Si IndexedDB est indisponible, l'application continue avec le stockage actuel. */
+    console.warn('Hydratation IndexedDB',e);
+  }
+}
+
+/* À partir de cette version, les sauvegardes courantes n'écrivent plus le gros JSON
+   complet dans localStorage. */
+saveAll=function(){
+  persistJobsV434();
+  try{localStorage.setItem('parage.auditLogs',JSON.stringify(auditLogs||[]));}catch(e){}
+  localStorage.setItem('parage.pendingSync','1');updateSyncBadge();
+  clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>sharedCloudBackup(false),1200);
+};
+
+/* Les historiques importés sont déjà des dossiers anciens : ils ne sont plus cochés
+   automatiquement comme dossiers à transmettre. Seuls les vrais chantiers non transmis le sont. */
+isToInvoiceV403=function(j){
+  if(!j||j.importedHistory===true||j.status!=='finished')return false;
+  if(j.accountingSentAt||j.exportedAt||j.paymentStatus==='sent'||isInvoicedV403(j)||isPaidV403(j))return false;
+  return true;
+};
+function deselectAllAccountingV434(){document.querySelectorAll('.accountingCheck').forEach(x=>x.checked=false);}
+
+function enforceV434Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v'+APP_VERSION_V434);
+  document.title='Suivi Parage v'+APP_VERSION_V434;
+}
+document.addEventListener('DOMContentLoaded',()=>{enforceV434Identity();setTimeout(hydrateJobsV434,250);});
+setTimeout(enforceV434Identity,0);setTimeout(enforceV434Identity,1000);setTimeout(enforceV434Identity,5000);
