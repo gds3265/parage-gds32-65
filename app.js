@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.35');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.1.0');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.35').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.1.0').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -2089,7 +2089,7 @@ const sharedPayloadV4Base=sharedPayload;
 sharedPayload=function(){return Object.assign({},sharedPayloadV4Base(),{auditLogs,version:APP_VERSION_V4});};
 
 function updateV4Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.1');document.title='Suivi Parage v4.0.1';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');document.title='Suivi Parage v4.1.0';
   const start=$('journalStart'),end=$('journalEnd');if(start&&!start.value){const d=new Date();d.setDate(d.getDate()-30);start.value=d.toISOString().slice(0,10);}if(end&&!end.value)end.value=today();
 }
 updateV4Identity();
@@ -2098,7 +2098,7 @@ setTimeout(updateV4Identity,500);
 /* =====================================================================
    V4.0.2 — Import historique 2025–2026 avec montants verrouillés
    ===================================================================== */
-const APP_VERSION_V402='4.0.2';
+const APP_VERSION_V402='4.1.0';
 
 const calcV402Base=calc;
 calc=function(job=current){
@@ -2229,7 +2229,7 @@ exportFilteredBalance=function(){
   const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n');download(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),`Bilan_${activeBalanceTab}_${filters.start||'debut'}_${filters.end||'fin'}.csv`);toast('Bilan filtré exporté');
 };
 
-function updateV402Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.2');document.title='Suivi Parage v4.0.2';installHistoricalPanelV402();renderHistoricalImportStatusV402();}
+function updateV402Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');document.title='Suivi Parage v4.1.0';installHistoricalPanelV402();renderHistoricalImportStatusV402();}
 const enterApplicationV402Base=enterApplication;
 enterApplication=async function(){const r=await enterApplicationV402Base();await importHistoricalDataV402(false);updateV402Identity();return r;};
 setTimeout(async()=>{installHistoricalPanelV402();await importHistoricalDataV402(false);updateV402Identity();},1800);
@@ -2237,7 +2237,7 @@ setTimeout(async()=>{installHistoricalPanelV402();await importHistoricalDataV402
 /* =====================================================================
    V4.0.3 — Tableau de bord comptable global et résumé exploitation
    ===================================================================== */
-const APP_VERSION_V403='4.0.3';
+const APP_VERSION_V403='4.1.0';
 let accountingFilterV403='all';
 
 function isPaidV403(j){return j.paymentStatus==='paid'||!!j.paidAt;}
@@ -2310,7 +2310,7 @@ renderPaymentAlert=function(){const r=renderPaymentAlertV403Base();renderFarmOve
 const fillJobV403Base=fillJob;
 fillJob=function(){const r=fillJobV403Base();renderFarmOverviewV403();return r;};
 
-function updateV403Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.3');document.title='Suivi Parage v4.0.3';}
+function updateV403Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');document.title='Suivi Parage v4.1.0';}
 const enterApplicationV403Base=enterApplication;
 enterApplication=async function(){const r=await enterApplicationV403Base();updateV403Identity();renderAccounting();return r;};
 setTimeout(()=>{updateV403Identity();renderAccounting();renderFarmOverviewV403();},2200);
@@ -2318,7 +2318,7 @@ setTimeout(()=>{updateV403Identity();renderAccounting();renderFarmOverviewV403()
 /* =====================================================================
    V4.0.4 — Détail des impayés, y compris historique importé
    ===================================================================== */
-const APP_VERSION_V404='4.0.4';
+const APP_VERSION_V404='4.1.0';
 const PAYMENT_DELAY_DAYS_V404=20;
 
 function invoiceDueDateV404(job){
@@ -2422,7 +2422,7 @@ renderStats=function(){
   return result;
 };
 
-function updateV404Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.4');document.title='Suivi Parage v4.0.4';}
+function updateV404Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');document.title='Suivi Parage v4.1.0';}
 const enterApplicationV404Base=enterApplication;
 enterApplication=async function(){const r=await enterApplicationV404Base();updateV404Identity();renderAccounting();return r;};
 setTimeout(()=>{updateV404Identity();renderAccounting();},2600);
@@ -2430,7 +2430,7 @@ setTimeout(()=>{updateV404Identity();renderAccounting();},2600);
 /* =====================================================================
    V4.0.5 — Liaison fiable Bilan économique -> détail comptable
    ===================================================================== */
-const APP_VERSION_V405='4.0.5';
+const APP_VERSION_V405='4.1.0';
 let accountingDrilldownV405=null;
 const accountingBaseRowsV405Original=accountingBaseRowsV403;
 const setAccountingFilterV405Original=setAccountingFilterV403;
@@ -2508,8 +2508,8 @@ renderStats=function(){
 };
 
 function updateV405Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.5');
-  document.title='Suivi Parage v4.0.5';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 const enterApplicationV405Base=enterApplication;
 enterApplication=async function(){
@@ -2524,7 +2524,7 @@ setTimeout(async()=>{try{await importHistoricalDataV402(false);}catch(e){}update
 /* =====================================================================
    V4.0.7 — Détail comptable garanti depuis le bilan
    ===================================================================== */
-const APP_VERSION_V407='4.0.7';
+const APP_VERSION_V407='4.1.0';
 let accountingSnapshotV406=null;
 
 function snapshotKeyV406(j){
@@ -2607,8 +2607,8 @@ renderStats=function(){
 };
 
 function updateV406Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.7');
-  document.title='Suivi Parage v4.0.7';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 const enterApplicationV406Base=enterApplication;
 enterApplication=async function(){
@@ -2657,7 +2657,7 @@ clearAccountingSnapshotV406=function(){
 /* =====================================================================
    V4.0.8 — panneau comptable unique, filtres réellement réinitialisables
    ===================================================================== */
-const APP_VERSION_V408='4.0.8';
+const APP_VERSION_V408='4.1.0';
 
 function accountingDetailHostV408(){
   return $('accountingDetailHost');
@@ -2726,8 +2726,8 @@ renderAccounting=function(){
 };
 
 function updateV408Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.8');
-  document.title='Suivi Parage v4.0.8';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 const enterApplicationV408Base=enterApplication;
 enterApplication=async function(){
@@ -2742,7 +2742,7 @@ setTimeout(()=>{updateV408Identity();clearAccountingDetailsV408();renderAccounti
 /* =====================================================================
    V4.0.9 — comptabilité complète incluant systématiquement l'historique
    ===================================================================== */
-const APP_VERSION_V409='4.0.9';
+const APP_VERSION_V409='4.1.0';
 let accountingHistoryLoadV409=null;
 
 function validAccountingJobV409(j){
@@ -2796,8 +2796,8 @@ renderAccounting=function(){
 };
 
 function updateV409Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.9');
-  document.title='Suivi Parage v4.0.9';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 const enterApplicationV409Base=enterApplication;
 enterApplication=async function(){
@@ -2812,7 +2812,7 @@ setTimeout(async()=>{await ensureAccountingHistoryV409();updateV409Identity();re
 /* =====================================================================
    V4.0.10 — remplacement définitif du moteur de la vue Comptabilité
    ===================================================================== */
-const APP_VERSION_V410='4.0.10';
+const APP_VERSION_V410='4.1.0';
 
 function accountingRowsV410(){
   const start=$('accountingStart')?.value||'';
@@ -2905,8 +2905,8 @@ handleAccountingCriteriaChangeV406=function(){clearAccountingDetailsV408();rende
 handleAccountingCriteriaChangeV408=handleAccountingCriteriaChangeV406;
 
 function updateV410Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.10');
-  document.title='Suivi Parage v4.0.10';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 const enterApplicationV410Base=enterApplication;
 enterApplication=async function(){
@@ -2922,7 +2922,7 @@ setTimeout(async()=>{await ensureAccountingHistoryV409();updateV410Identity();re
 /* =====================================================================
    V4.0.11 — CA mensuel accueil + Nécrose + pro forma multipage
    ===================================================================== */
-const APP_VERSION_V411='4.0.11';
+const APP_VERSION_V411='4.1.0';
 
 /* Accueil : ajoute le CA TTC du mois en cours sur les dossiers validés. */
 const renderHomeV411Base=renderHome;
@@ -3066,8 +3066,8 @@ function makeProformaPdfV411(job){
 proformaPdfBlob=function(job){return new Blob([makeProformaPdfV411(job)],{type:'application/pdf'});};
 
 function updateV411Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.11');
-  document.title='Suivi Parage v4.0.11';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 const enterApplicationV411Base=enterApplication;
 enterApplication=async function(){
@@ -3082,7 +3082,7 @@ setTimeout(()=>{updateV411Identity();if($('homeCards'))renderHome();},5000);
 /* =====================================================================
    V4.0.12 — règlement à réception + historique tarifaire + tarifs figés
    ===================================================================== */
-const APP_VERSION_V412='4.0.12';
+const APP_VERSION_V412='4.1.0';
 let tariffHistory=JSON.parse(localStorage.getItem('parage.tariffHistory')||'[]');
 const tariffKeysV412={
   defaultFee:'Forfait déplacement / mise en place',
@@ -3231,8 +3231,8 @@ const sharedPayloadV412Base=sharedPayload;
 sharedPayload=function(){return Object.assign({},sharedPayloadV412Base(),{tariffHistory,version:APP_VERSION_V412});};
 
 function updateV412Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.12');
-  document.title='Suivi Parage v4.0.12';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
   tariffHistoryPanelV412();installPaymentRuleV412();
 }
 const showViewV412Base=showView;
@@ -3249,7 +3249,7 @@ setTimeout(()=>{migrateFinishedPricingV412();updateV412Identity();},5200);
 /* =====================================================================
    V4.0.13 — synchronisation sans perte + corbeille fiable + commentaire compta
    ===================================================================== */
-const APP_VERSION_V413='4.0.13';
+const APP_VERSION_V413='4.1.0';
 let deletedJobsV413=JSON.parse(localStorage.getItem('parage.deletedJobsV413')||'{}');
 
 function touchJobV413(job){
@@ -3369,8 +3369,8 @@ cloudRestore=()=>sharedCloudRestore(false);
 window.addEventListener('online',()=>{updateSyncBadge();sharedCloudRestore(true).then(()=>sharedCloudBackup(false));});
 
 function updateV413Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.13');
-  document.title='Suivi Parage v4.0.13';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 const enterApplicationV413Base=enterApplication;
 enterApplication=async function(){const r=await enterApplicationV413Base();updateV413Identity();renderHome();renderHistory();renderAccounting();return r;};
@@ -3401,7 +3401,7 @@ cancelCurrentJob=function(){
    - une pierre tombale ne supprime qu'une version plus ancienne du chantier
    - mise à jour PWA forcée sur tous les appareils
    ===================================================================== */
-const APP_VERSION_V414='4.0.14';
+const APP_VERSION_V414='4.1.0';
 
 function deletionStampV414(id){
   const n=Date.parse(deletedJobsV413?.[id]||'');
@@ -3509,14 +3509,14 @@ sharedCloudBackup=async function(showToast=true){
 };
 cloudBackup=sharedCloudBackup;
 
-function updateV414Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.14');document.title='Suivi Parage v4.0.14';}
+function updateV414Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');document.title='Suivi Parage v4.1.0';}
 const enterApplicationV414Base=enterApplication;
 enterApplication=async function(){const r=await enterApplicationV414Base();updateV414Identity();return r;};
 setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.35',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.1.0',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3524,7 +3524,7 @@ if('serviceWorker' in navigator){
 /* =====================================================================
    V4.0.15 : recherche éleveur + dermatite au pied + nom éleveur pro forma
    ===================================================================== */
-const APP_VERSION_V415='4.0.15';
+const APP_VERSION_V415='4.1.0';
 
 function normalizeSearchV415(v){
   return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
@@ -3617,9 +3617,9 @@ prepareAndShareAccounting=async function(){
 };
 downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAndShareAccounting;
 
-function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
+function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');document.title='Suivi Parage v4.1.0';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.35',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.1.0',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3627,7 +3627,7 @@ if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.3
    - Les chantiers figés conservent les TARIFS historiques, mais leurs montants
      se recalculent si le contenu du chantier est corrigé/modifié.
    ===================================================================== */
-const APP_VERSION_V416='4.0.16';
+const APP_VERSION_V416='4.1.0';
 
 function calcV416(job=current){
   const animals=(job?.animals||[]).map(syncLegacyAnimal);
@@ -3669,8 +3669,8 @@ calc=function(job=current){
 };
 
 function updateV416Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.16');
-  document.title='Suivi Parage v4.0.16';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 const initV416Base=init;
 init=async function(){const r=await initV416Base();updateV416Identity();return r;};
@@ -3685,7 +3685,7 @@ setTimeout(updateV416Identity,1200);
      recalcule immédiatement et est enregistrée sans repasser un chantier
      déjà validé en brouillon.
    ===================================================================== */
-const APP_VERSION_V417='4.0.17';
+const APP_VERSION_V417='4.1.0';
 
 (function migrateManyRatesV417(){
   if(localStorage.getItem('parage.ratesMigrationV417'))return;
@@ -3737,7 +3737,7 @@ document.addEventListener('input',e=>{
   saveAll();renderTotals();
 });
 
-function updateV417Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.17');document.title='Suivi Parage v4.0.17';}
+function updateV417Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');document.title='Suivi Parage v4.1.0';}
 const initV417Base=init;init=async function(){const r=await initV417Base();updateV417Identity();return r;};
 setTimeout(updateV417Identity,0);setTimeout(updateV417Identity,1200);
 
@@ -3748,7 +3748,7 @@ setTimeout(updateV417Identity,0);setTimeout(updateV417Identity,1200);
    - Enregistre immédiatement le tarif personnalisé sur le chantier ouvert.
    - Un chantier validé reste validé et son snapshot tarifaire est actualisé.
    ===================================================================== */
-const APP_VERSION_V418='4.0.18';
+const APP_VERSION_V418='4.1.0';
 
 function decimalValueV418(v){
   const s=String(v??'').trim().replace(',','.');
@@ -3828,8 +3828,8 @@ if(+settings.footMany===10)settings.footMany=7.5;
 localStorage.setItem('parage.settings',JSON.stringify(settings));
 
 function updateV418Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.18');
-  document.title='Suivi Parage v4.0.18';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 const initV418Base=init;
 init=async function(){const r=await initV418Base();updateV418Identity();return r;};
@@ -3843,13 +3843,13 @@ setTimeout(updateV418Identity,0);setTimeout(updateV418Identity,1200);setTimeout(
    - Recharge automatique dès qu'un nouveau service worker prend le contrôle.
    - Aucune donnée métier/localStorage n'est effacée.
    ===================================================================== */
-const APP_VERSION_V419='4.0.33';
+const APP_VERSION_V419='4.1.0';
 let parageReloadingV419=false;
 
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.35',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.1.0',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -3891,8 +3891,8 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 setInterval(checkRemoteVersionV419,15*60*1000);
 
 function updateV419Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.24');
-  document.title='Suivi Parage v4.0.24';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 const initV419Base=init;
 init=async function(){const r=await initV419Base();updateV419Identity();checkRemoteVersionV419();return r;};
@@ -3907,7 +3907,7 @@ setTimeout(updateV419Identity,0);setTimeout(updateV419Identity,1200);setTimeout(
    - Une suppression définitive d'un dossier historique reste supprimée :
      l'import historique respecte désormais les pierres tombales.
    ===================================================================== */
-const APP_VERSION_V421='4.0.21';
+const APP_VERSION_V421='4.1.0';
 
 function normalizeDepartmentV421(value){
   const s=String(value??'').trim();
@@ -4035,8 +4035,8 @@ importHistoricalDataV402=async function(force=false){
 };
 
 function updateV421Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.21');
-  document.title='Suivi Parage v4.0.21';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 const initV421Base=init;
 init=async function(){const r=await initV421Base();updateV421Identity();renderHome();return r;};
@@ -4044,13 +4044,13 @@ setTimeout(updateV421Identity,0);setTimeout(updateV421Identity,1200);setTimeout(
 
 
 /* V4.0.24 — correctif boucle de rechargement PWA */
-const APP_VERSION_V422='4.0.24';
-function updateV422Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.24');document.title='Suivi Parage v4.0.24';}
+const APP_VERSION_V422='4.1.0';
+function updateV422Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');document.title='Suivi Parage v4.1.0';}
 const initV422Base=init;init=async function(){const r=await initV422Base();updateV422Identity();return r;};
 setTimeout(updateV422Identity,0);setTimeout(updateV422Identity,1500);setTimeout(updateV422Identity,8000);
 
 /* V4.0.24 — corbeille fiable pour l'historique importé */
-const APP_VERSION_V423='4.0.24';
+const APP_VERSION_V423='4.1.0';
 
 // Le code historique V4.0.2 interceptait les actions AVANT de regarder si le
 // dossier était en corbeille. Un historique déjà supprimé affichait donc encore
@@ -4079,8 +4079,8 @@ permanentlyDeleteJobV331=function(id){
 };
 
 function updateV423Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.24');
-  document.title='Suivi Parage v4.0.24';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 const initV423Base=init;
 init=async function(){const r=await initV423Base();updateV423Identity();return r;};
@@ -4094,7 +4094,7 @@ setTimeout(updateV423Identity,0);setTimeout(updateV423Identity,1500);setTimeout(
    - Gratuités : animal entier, parage, pansements ou talonnettes.
      Les quantités restent comptées ; seules les quantités facturables sont payantes.
    ===================================================================== */
-const APP_VERSION_V424='4.0.24';
+const APP_VERSION_V424='4.1.0';
 
 function freeServicesV424(animal){
   if(!animal.freeServicesV424 || typeof animal.freeServicesV424!=='object') animal.freeServicesV424={};
@@ -4255,7 +4255,7 @@ function closeJobMenusV424(except=null){document.querySelectorAll('details.jobMe
 document.addEventListener('click',e=>{const menu=e.target.closest?.('details.jobMenu');if(!menu)closeJobMenusV424();else if(e.target.closest('button'))setTimeout(()=>menu.removeAttribute('open'),0);});
 window.addEventListener('scroll',()=>closeJobMenusV424(),{passive:true});
 
-function updateV424Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.24');document.title='Suivi Parage v4.0.24';}
+function updateV424Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');document.title='Suivi Parage v4.1.0';}
 const initV424Base=init;init=async function(){const r=await initV424Base();updateV424Identity();return r;};
 setTimeout(updateV424Identity,0);setTimeout(updateV424Identity,1500);setTimeout(updateV424Identity,8000);
 
@@ -4265,7 +4265,7 @@ setTimeout(updateV424Identity,0);setTimeout(updateV424Identity,1500);setTimeout(
    - Tous les commentaires terrain remontent sur la pro forma ; accountingComment reste interne.
    - Les historiques importés peuvent être marqués transmis en masse sans générer des centaines de PDF.
    ===================================================================== */
-const APP_VERSION_V425='4.0.25';
+const APP_VERSION_V425='4.1.0';
 
 function footDetailV425(animal,code){
   if(!animal.footDetailsV425||typeof animal.footDetailsV425!=='object')animal.footDetailsV425={};
@@ -4398,7 +4398,7 @@ sendAccountingDay=async function(){
   saveAll();await cloudBackup(false);renderAccounting();renderExports();if(hist.length)toast(`${hist.length} historique(s) + ${live.length} chantier(s) traités`);
 };
 
-function updateV425Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.25');document.title='Suivi Parage v4.0.25';}
+function updateV425Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');document.title='Suivi Parage v4.1.0';}
 const initV425Base=init;init=async function(){const r=await initV425Base();updateV425Identity();return r;};
 setTimeout(updateV425Identity,0);setTimeout(updateV425Identity,1500);setTimeout(updateV425Identity,8000);
 
@@ -4409,7 +4409,7 @@ setTimeout(updateV425Identity,0);setTimeout(updateV425Identity,1500);setTimeout(
    - Verrouille le badge et le titre sur la version finale malgré les anciens
      modules de migration qui réappliquent brièvement leur ancien numéro.
    ===================================================================== */
-const APP_VERSION_V426='4.0.33';
+const APP_VERSION_V426='4.1.0';
 function enforceV426Identity(){
   document.querySelectorAll('.versionBadge').forEach(x=>{
     if(x.textContent!=='v'+APP_VERSION_V426)x.textContent='v'+APP_VERSION_V426;
@@ -4514,8 +4514,8 @@ openPdfPreview=function(blob,name,options={}){
 };
 
 function enforceV428Identity(){
-  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.33');
-  document.title='Suivi Parage v4.0.33';
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');
+  document.title='Suivi Parage v4.1.0';
 }
 document.addEventListener('DOMContentLoaded',()=>{enforceV428Identity();setTimeout(()=>renderGeneratedFiles().catch(()=>{}),800);});
 setTimeout(enforceV428Identity,0);setTimeout(enforceV428Identity,1000);setTimeout(enforceV428Identity,5000);
@@ -4571,7 +4571,7 @@ function renderAnimalSearchV429(){
   host.innerHTML=`<div class="searchCountV429">${hits.length} passage(s) retrouvé(s) · ${farms.size} élevage(s)</div>`+hits.map(({j,a})=>{const d=animalSearchDetailsV429(a);return `<div class="panel animalSearchCardV429"><div class="toolbar"><h3>Bovin ${esc(a.number||'-')}</h3><b>${fmtDate(j.date)}</b></div><p><b>${esc(j.clientName||'')}</b> · Cheptel ${esc(j.cheptel||'')}${j.cpVille?` · ${esc(j.cpVille)}`:''}</p><div class="animalSearchGridV429"><div><b>Pieds</b><br>${esc(d.feet)}</div><div><b>Problèmes</b><br>${esc(d.probs)}</div><div><b>Soins</b><br>${esc(d.care)}</div><div><b>Observations</b><br>${esc(d.notes)}</div></div></div>`;}).join('');
 }
 
-function enforceV429Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.33');document.title='Suivi Parage v4.0.33';}
+function enforceV429Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');document.title='Suivi Parage v4.1.0';}
 document.addEventListener('DOMContentLoaded',()=>{enforceV429Identity();});
 setTimeout(enforceV429Identity,0);setTimeout(enforceV429Identity,1000);setTimeout(enforceV429Identity,5000);
 
@@ -4579,7 +4579,7 @@ setTimeout(enforceV429Identity,0);setTimeout(enforceV429Identity,1000);setTimeou
 /* =========================================================
    V4.0.33 — recherche par nom d’éleveur et commune
    ========================================================= */
-function enforceV432Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.33');document.title='Suivi Parage v4.0.33';}
+function enforceV432Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.1.0');document.title='Suivi Parage v4.1.0';}
 document.addEventListener('DOMContentLoaded',()=>{enforceV432Identity();});
 setTimeout(enforceV432Identity,0);setTimeout(enforceV432Identity,1000);setTimeout(enforceV432Identity,5000);
 
@@ -4587,7 +4587,7 @@ setTimeout(enforceV432Identity,0);setTimeout(enforceV432Identity,1000);setTimeou
 /* =========================================================
    V4.0.33 — diagnostic détaillé de synchronisation Supabase
    ========================================================= */
-const APP_VERSION_V433='4.0.33';
+const APP_VERSION_V433='4.1.0';
 let lastSyncDiagnosticV433='';
 
 function syncErrorDetailV433(status, raw, stage){
@@ -4675,7 +4675,7 @@ setTimeout(enforceV433Identity,0);setTimeout(enforceV433Identity,1000);setTimeou
 /* =========================================================
    V4.0.34 — stockage volumineux fiable + sélection comptabilité
    ========================================================= */
-const APP_VERSION_V434='4.0.34';
+const APP_VERSION_V434='4.1.0';
 const PARAGE_DB_V434='suivi-parage-storage';
 const PARAGE_STORE_V434='state';
 
@@ -4768,7 +4768,7 @@ setTimeout(enforceV434Identity,0);setTimeout(enforceV434Identity,1000);setTimeou
 /* =========================================================
    V4.0.35 — état de synchronisation unique et stable
    ========================================================= */
-const APP_VERSION_V435='4.0.35';
+const APP_VERSION_V435='4.1.0';
 let syncPendingUiTimerV435=null;
 let lastSyncUiStateV435='';
 let lastSyncUiAtV435=0;
