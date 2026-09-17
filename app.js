@@ -98,7 +98,7 @@ async function init() {
   current = blankJob();
   chantierStarted = false;
   updateChantierUI();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.34');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.35');
 }
 
 function bindClient() {
@@ -940,7 +940,7 @@ init = async function() {
   renderHome();
   newJob();
   renderGeneratedFiles();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.34').then(r => r.update()).catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=4.0.35').then(r => r.update()).catch(()=>{});
 };
 
 function openArchiveDb() {
@@ -3516,7 +3516,7 @@ setTimeout(updateV414Identity,5800);
 
 /* Force l'installation immédiate de la nouvelle version PWA. */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=4.0.34',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4.0.35',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
   let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload();});
 }
 
@@ -3619,7 +3619,7 @@ downloadAccountingZip=prepareAndShareAccounting;prepareAccountingEmail=prepareAn
 
 function updateV415Identity(){document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v4.0.15');document.title='Suivi Parage v4.0.15';installClientSearchV415();}
 const enterApplicationV415Base=enterApplication;enterApplication=async function(){const r=await enterApplicationV415Base();updateV415Identity();return r;};setTimeout(updateV415Identity,6200);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.34',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js?v=4.0.35',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
 
 /* =====================================================================
    V4.0.16 — déconnexion mobile + calcul fiable des pieds/paires
@@ -3849,7 +3849,7 @@ let parageReloadingV419=false;
 async function forceParageUpdateV419(){
   if(!('serviceWorker' in navigator))return;
   try{
-    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.34',{updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('sw.js?v=4.0.35',{updateViaCache:'none'});
     await reg.update();
   }catch(e){}
 }
@@ -4764,3 +4764,69 @@ function enforceV434Identity(){
 }
 document.addEventListener('DOMContentLoaded',()=>{enforceV434Identity();setTimeout(hydrateJobsV434,250);});
 setTimeout(enforceV434Identity,0);setTimeout(enforceV434Identity,1000);setTimeout(enforceV434Identity,5000);
+
+/* =========================================================
+   V4.0.35 — état de synchronisation unique et stable
+   ========================================================= */
+const APP_VERSION_V435='4.0.35';
+let syncPendingUiTimerV435=null;
+let lastSyncUiStateV435='';
+let lastSyncUiAtV435=0;
+
+function applySyncStateV435(state,label,detail=''){
+  const b=$('syncBadge');if(!b)return;
+  if(syncPendingUiTimerV435){clearTimeout(syncPendingUiTimerV435);syncPendingUiTimerV435=null;}
+  const commit=()=>{
+    // Ne réécrit pas le DOM en boucle lorsque l'état n'a pas changé.
+    const signature=state+'|'+label;
+    if(signature===lastSyncUiStateV435)return;
+    lastSyncUiStateV435=signature;lastSyncUiAtV435=Date.now();
+    b.textContent=label;
+    b.className='syncBadge '+(state==='ok'?'ok':state==='working'?'working':state==='error'?'error':'pending');
+    if(state!=='error' && !lastSyncDiagnosticV433){b.title='';b.onclick=null;}
+    if(detail)b.title=detail;
+  };
+  // L'état « en attente » est volontairement retardé : une sauvegarde locale est
+  // généralement suivie immédiatement par l'envoi cloud et ne doit pas faire clignoter l'UI.
+  if(state==='pending'&&navigator.onLine){syncPendingUiTimerV435=setTimeout(commit,900);return;}
+  commit();
+}
+
+function updateSyncBadgeV435(text=''){
+  if(!navigator.onLine){applySyncStateV435('pending','Hors ligne · données enregistrées');return;}
+  const t=String(text||'').toLowerCase();
+  if(t.includes('erreur')){applySyncStateV435('error',text||'Erreur de synchronisation',lastSyncDiagnosticV433||'');return;}
+  if(t.includes('synchron')){applySyncStateV435('working','Synchronisation…');return;}
+  if(localStorage.getItem('parage.pendingSync')==='1'){
+    applySyncStateV435('pending','En attente de synchronisation');return;
+  }
+  applySyncStateV435('ok','Cloud à jour');
+}
+
+// Une seule source de vérité pour le bandeau, y compris lorsque d'anciens modules
+// tentent encore d'actualiser leur ancien statut.
+updateSyncBadge=function(text){updateSyncBadgeV435(text||'');};
+updateSyncBadgeV20=function(){updateSyncBadgeV435('');};
+try{localStorage.removeItem('parage.syncPending');}catch(_){ }
+
+// Le diagnostic détaillé reste cliquable en cas d'erreur.
+const setSyncDiagnosticV433BaseV435=setSyncDiagnosticV433;
+setSyncDiagnosticV433=function(info){
+  setSyncDiagnosticV433BaseV435(info);
+  if(info){
+    const b=$('syncBadge');if(b){
+      b.className='syncBadge error';
+      b.textContent='Erreur sync · '+(info.short||'voir détail');
+      lastSyncUiStateV435='error|'+b.textContent;
+    }
+  }
+};
+
+function enforceV435Identity(){
+  document.querySelectorAll('.versionBadge').forEach(x=>x.textContent='v'+APP_VERSION_V435);
+  document.title='Suivi Parage v'+APP_VERSION_V435;
+}
+document.addEventListener('DOMContentLoaded',()=>{enforceV435Identity();setTimeout(()=>updateSyncBadgeV435(''),500);});
+window.addEventListener('online',()=>updateSyncBadgeV435(''));
+window.addEventListener('offline',()=>updateSyncBadgeV435(''));
+setTimeout(enforceV435Identity,0);setTimeout(enforceV435Identity,1000);setTimeout(enforceV435Identity,5000);
